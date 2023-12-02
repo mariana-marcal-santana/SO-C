@@ -6,6 +6,8 @@
 #include "constants.h"
 #include "operations.h"
 #include "parser.h"
+#include "dirent.h"
+#include "files.h"
 
 int main(int argc, char *argv[]) {
   unsigned int state_access_delay_ms = STATE_ACCESS_DELAY_MS;
@@ -18,10 +20,22 @@ int main(int argc, char *argv[]) {
       fprintf(stderr, "Invalid delay value or value too large\n");
       return 1;
     }
-
     state_access_delay_ms = (unsigned int)delay;
-  }
 
+  }
+  if (argc > 2) {
+    char * path = argv[2];
+    DIR * dir = opendir(path);
+    
+    if (dir == NULL) {
+      fprintf(stderr, "Invalid path\n");
+      return 1;
+    }
+    else {
+      exeDir(dir);
+      closedir(dir);
+    }
+  }
   if (ems_init(state_access_delay_ms)) {
     fprintf(stderr, "Failed to initialize EMS\n");
     return 1;
