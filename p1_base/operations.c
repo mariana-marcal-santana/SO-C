@@ -64,6 +64,7 @@ int ems_terminate() {
   }
 
   free_list(event_list);
+  event_list = NULL;
   return 0;
 }
 

@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-
+#include <dirent.h>
 
 #include "constants.h"
 #include "operations.h"
@@ -48,7 +48,6 @@ int main(int argc, char *argv[]) {
   while ((entry = readdir(dir)) != NULL) {
     
     char currentPath[MAX_PATH_LENGTH];
-        
         // Verifica se o nome do arquivo tem a extensão .jobs
         if (strcmp(entry->d_name + strlen(entry->d_name) - 5, ".jobs") == 0) {
             // Abre o arquivo de entrada
@@ -76,6 +75,7 @@ int main(int argc, char *argv[]) {
         // Processa o arquivo de entrada
 
         // Initialize the event management system
+        //ems_terminate();
         if (ems_init(state_access_delay_ms)) {
           fprintf(stderr, "Failed to initialize EMS\n");
           return 1;
@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
         int exitFlag = 0;
         // Main command processing loop
         while (!exitFlag) {
-          printf("while");
+
           unsigned int event_id, delay;
           size_t num_rows, num_columns, num_coords;
           size_t xs[MAX_RESERVATION_SIZE], ys[MAX_RESERVATION_SIZE];
@@ -179,13 +179,8 @@ int main(int argc, char *argv[]) {
               close(fd_input);
               exitFlag = 1;
               break;
-              //closedir(dir);
-              //return 0;
           }
         }
-
-        //ems_terminate();
-        //close(fd_input);
 
         // Restore the standard input
         if (dup2(saved_stdin, STDIN_FILENO) == -1) {
@@ -193,8 +188,6 @@ int main(int argc, char *argv[]) {
             close(fd_input);
             continue;
         }
-
-        //close(fd_input);
   }
   closedir(dir);
   return 0;
