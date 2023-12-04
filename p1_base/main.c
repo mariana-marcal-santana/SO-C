@@ -3,22 +3,18 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <dirent.h>
-
+#include <sys/stat.h>
+#include <fcntl.h>
 #include "constants.h"
 #include "operations.h"
 #include "parser.h"
 #include "dirent.h"
 
-#include <sys/stat.h>
-#include <fcntl.h>
-
-#define MAX_PATH_LENGTH 256
-
 int main(int argc, char *argv[]) {
+
   unsigned int state_access_delay_ms = STATE_ACCESS_DELAY_MS;
 
-  // Check if a directory path is provided
+  // Check if a delay is provided
   if (argc > 2) {
     char *endptr;
     unsigned long int delay = strtoul(argv[2], &endptr, 10);
@@ -30,13 +26,14 @@ int main(int argc, char *argv[]) {
     state_access_delay_ms = (unsigned int)delay;
   }
 
+  // Open the directory
   DIR *dir = opendir(argv[1]);
-
   if (dir == NULL) {
     fprintf(stderr, "Invalid path\n");
     return 1;
   }
   
+  // Set the path to the provided directory
   struct dirent *entry;
   char dirPath[MAX_PATH_LENGTH];
   getcwd(dirPath, sizeof(dirPath));
@@ -44,17 +41,20 @@ int main(int argc, char *argv[]) {
   strcat(dirPath,argv[1]);
   strcat(dirPath,"/");
 
+  // Read the directory
   while ((entry = readdir(dir)) != NULL) {
     
     char currentPath[MAX_PATH_LENGTH];
-      // Verifica se o nome do arquivo tem a extensão .jobs
+    char currentPath2[MAX_PATH_LENGTH];
+      // Check if the file is a .jobs file
       if (strcmp(entry->d_name + strlen(entry->d_name) - 5, ".jobs") == 0) {
-            strcpy(currentPath, dirPath);
-            strcat(currentPath, entry->d_name);
-            printf("%s\n", entry->d_name);
-
+        strcpy(currentPath, dirPath);
+        strcat(currentPath, entry->d_name);
+        
+        // Open the file
         int fd_input = open(currentPath, O_RDONLY);
         int saved_stdin = dup(STDIN_FILENO);
+        int saved_stdout = dup(STDOUT_FILENO);
 
         if (fd_input == -1) {
             perror("Failed to open input file");
@@ -62,14 +62,17 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        // Cria o nome do arquivo de saída
+        // Set the output file name
         char output_filename[strlen(entry->d_name) + 1];
         strcpy(output_filename, entry->d_name);
         strncpy(output_filename + strlen(output_filename) - 5, ".out", 5);
         output_filename[strlen(entry->d_name)] = '\0';
+        strcpy(currentPath2, dirPath);
+        strcat(currentPath2, output_filename);
+        //printf("Output file: %s\n", currentPath2);
 
-        // Abre o arquivo de saída
-        int fd_output = open(output_filename, O_WRONLY | O_CREAT | O_TRUNC, S_IWUSR | S_IRUSR);
+        // Open the output file
+        int fd_output = open(currentPath2, O_WRONLY | O_CREAT | O_TRUNC, S_IWUSR | S_IRUSR);
         if (fd_output == -1) {
             perror("Failed to open output file");
             fprintf(stderr, "File name: %s\n", output_filename);
@@ -77,7 +80,6 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        // Redireciona a entrada padrão para o arquivo de entrada
         if (dup2(fd_output, STDOUT_FILENO) == -1) {
             perror("Failed to redirect stdout");
             close(fd_output);
@@ -88,23 +90,20 @@ int main(int argc, char *argv[]) {
             close(fd_input);
             continue;
         }
-
+        //printf("Input file: %s\n", currentPath);
         // Initialize the event management system
         if (ems_init(state_access_delay_ms)) {
           fprintf(stderr, "Failed to initialize EMS\n");
           return 1;
         }
 
-        int exitFlag = 0;
         // Main command processing loop
+        int exitFlag = 0;
         while (!exitFlag) {
           
           unsigned int event_id, delay;
           size_t num_rows, num_columns, num_coords;
           size_t xs[MAX_RESERVATION_SIZE], ys[MAX_RESERVATION_SIZE];
-
-          //printf("> ");
-          //fflush(stdout);
 
           switch (get_next(fd_input)) {
             
@@ -202,7 +201,7 @@ int main(int argc, char *argv[]) {
             close(fd_input);
             continue;
         }
-        if (dup2(saved_stdin, STDOUT_FILENO) == -1) {
+        if (dup2(saved_stdout, STDOUT_FILENO) == -1) {
             perror("Failed to restore stdout");
             close(fd_output);
             continue;
