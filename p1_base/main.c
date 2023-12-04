@@ -48,14 +48,15 @@ int main(int argc, char *argv[]) {
     char currentPath2[MAX_PATH_LENGTH];
       // Check if the file is a .jobs file
       if (strcmp(entry->d_name + strlen(entry->d_name) - 5, ".jobs") == 0) {
+        // Set the path to the file
         strcpy(currentPath, dirPath);
         strcat(currentPath, entry->d_name);
         
-        // Open the file
-        int fd_input = open(currentPath, O_RDONLY);
         int saved_stdin = dup(STDIN_FILENO);
         int saved_stdout = dup(STDOUT_FILENO);
 
+        // Open the file
+        int fd_input = open(currentPath, O_RDONLY);
         if (fd_input == -1) {
             perror("Failed to open input file");
             fprintf(stderr, "File name: %s\n", currentPath);
@@ -79,6 +80,7 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
+        // Redirect the standard input and output
         if (dup2(fd_output, STDOUT_FILENO) == -1) {
             perror("Failed to redirect stdout");
             close(fd_output);
@@ -89,7 +91,7 @@ int main(int argc, char *argv[]) {
             close(fd_input);
             continue;
         }
-        //printf("Input file: %s\n", currentPath);
+
         // Initialize the event management system
         if (ems_init(state_access_delay_ms)) {
           fprintf(stderr, "Failed to initialize EMS\n");
@@ -194,7 +196,8 @@ int main(int argc, char *argv[]) {
               break;
           }
         }
-        // Restore the standard input
+
+        // Restore the standard input and output
         if (dup2(saved_stdin, STDIN_FILENO) == -1) {
             perror("Failed to restore stdin");
             close(fd_input);
@@ -205,6 +208,8 @@ int main(int argc, char *argv[]) {
             close(fd_output);
             continue;
         }
+
+        // Close the files
         close(fd_input);
         close(fd_output);
       }
