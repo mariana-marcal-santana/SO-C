@@ -69,8 +69,7 @@ int main(int argc, char *argv[]) {
         output_filename[strlen(entry->d_name)] = '\0';
         strcpy(currentPath2, dirPath);
         strcat(currentPath2, output_filename);
-        //printf("Output file: %s\n", currentPath2);
-
+        
         // Open the output file
         int fd_output = open(currentPath2, O_WRONLY | O_CREAT | O_TRUNC, S_IWUSR | S_IRUSR);
         if (fd_output == -1) {
@@ -100,7 +99,9 @@ int main(int argc, char *argv[]) {
         // Main command processing loop
         int exitFlag = 0;
         while (!exitFlag) {
-          
+
+          fflush(stdout);
+
           unsigned int event_id, delay;
           size_t num_rows, num_columns, num_coords;
           size_t xs[MAX_RESERVATION_SIZE], ys[MAX_RESERVATION_SIZE];
@@ -189,8 +190,6 @@ int main(int argc, char *argv[]) {
             case EOC:
               // Terminate the program
               ems_terminate();
-              close(fd_input);
-              close(fd_output);
               exitFlag = 1;
               break;
           }
@@ -206,6 +205,8 @@ int main(int argc, char *argv[]) {
             close(fd_output);
             continue;
         }
+        close(fd_input);
+        close(fd_output);
       }
   }
   closedir(dir);
