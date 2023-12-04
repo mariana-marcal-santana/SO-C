@@ -13,7 +13,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-
 #define MAX_PATH_LENGTH 256
 
 int main(int argc, char *argv[]) {
@@ -48,13 +47,11 @@ int main(int argc, char *argv[]) {
   while ((entry = readdir(dir)) != NULL) {
     
     char currentPath[MAX_PATH_LENGTH];
-        // Verifica se o nome do arquivo tem a extensão .jobs
-        if (strcmp(entry->d_name + strlen(entry->d_name) - 5, ".jobs") == 0) {
-            // Abre o arquivo de entrada
+      // Verifica se o nome do arquivo tem a extensão .jobs
+      if (strcmp(entry->d_name + strlen(entry->d_name) - 5, ".jobs") == 0) {
             strcpy(currentPath, dirPath);
             strcat(currentPath, entry->d_name);
             printf("%s\n", entry->d_name);
-        }
 
         int fd_input = open(currentPath, O_RDONLY);
         int saved_stdin = dup(STDIN_FILENO);
@@ -65,17 +62,34 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
+        // Cria o nome do arquivo de saída
+        char output_filename[strlen(entry->d_name) + 1];
+        strcpy(output_filename, entry->d_name);
+        strncpy(output_filename + strlen(output_filename) - 5, ".out", 5);
+        output_filename[strlen(entry->d_name)] = '\0';
+
+        // Abre o arquivo de saída
+        int fd_output = open(output_filename, O_WRONLY | O_CREAT | O_TRUNC, S_IWUSR | S_IRUSR);
+        if (fd_output == -1) {
+            perror("Failed to open output file");
+            fprintf(stderr, "File name: %s\n", output_filename);
+            close(fd_input);
+            continue;
+        }
+
         // Redireciona a entrada padrão para o arquivo de entrada
+        if (dup2(fd_output, STDOUT_FILENO) == -1) {
+            perror("Failed to redirect stdout");
+            close(fd_output);
+            continue;
+        }
         if (dup2(fd_input, STDIN_FILENO) == -1) {
             perror("Failed to redirect stdin");
             close(fd_input);
             continue;
         }
 
-        // Processa o arquivo de entrada
-
         // Initialize the event management system
-        //ems_terminate();
         if (ems_init(state_access_delay_ms)) {
           fprintf(stderr, "Failed to initialize EMS\n");
           return 1;
@@ -84,7 +98,7 @@ int main(int argc, char *argv[]) {
         int exitFlag = 0;
         // Main command processing loop
         while (!exitFlag) {
-
+          
           unsigned int event_id, delay;
           size_t num_rows, num_columns, num_coords;
           size_t xs[MAX_RESERVATION_SIZE], ys[MAX_RESERVATION_SIZE];
@@ -177,17 +191,23 @@ int main(int argc, char *argv[]) {
               // Terminate the program
               ems_terminate();
               close(fd_input);
+              close(fd_output);
               exitFlag = 1;
               break;
           }
         }
-
         // Restore the standard input
         if (dup2(saved_stdin, STDIN_FILENO) == -1) {
             perror("Failed to restore stdin");
             close(fd_input);
             continue;
         }
+        if (dup2(saved_stdin, STDOUT_FILENO) == -1) {
+            perror("Failed to restore stdout");
+            close(fd_output);
+            continue;
+        }
+      }
   }
   closedir(dir);
   return 0;
