@@ -44,7 +44,7 @@ int main(int argc, char *argv[]) {
   // Read the directory
   while ((entry = readdir(dir)) != NULL) {
 
-    fflush(stdout);
+    //fflush(stdout);
     
     char currentPath[MAX_PATH_LENGTH];
     char currentPath2[MAX_PATH_LENGTH];
@@ -104,7 +104,7 @@ int main(int argc, char *argv[]) {
         int exitFlag = 0;
         while (!exitFlag) {
 
-          fflush(stdout);
+           fflush(stdout);
 
           unsigned int event_id, delay;
           size_t num_rows, num_columns, num_coords;
