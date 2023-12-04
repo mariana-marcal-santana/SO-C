@@ -39,16 +39,20 @@ int main(int argc, char *argv[]) {
   }
   
   struct dirent *entry;
-  char currentPath[MAX_PATH_LENGTH];
+  char dirPath[MAX_PATH_LENGTH];
+  getcwd(dirPath, sizeof(dirPath));
+  strcat(dirPath,"/");
+  strcat(dirPath,argv[1]);
+  strcat(dirPath,"/");
 
   while ((entry = readdir(dir)) != NULL) {
     
-    getcwd(currentPath, sizeof(currentPath));
+    char currentPath[MAX_PATH_LENGTH];
         
         // Verifica se o nome do arquivo tem a extensão .jobs
         if (strcmp(entry->d_name + strlen(entry->d_name) - 5, ".jobs") == 0) {
             // Abre o arquivo de entrada
-            strcat(currentPath,"/jobs/");
+            strcpy(currentPath, dirPath);
             strcat(currentPath, entry->d_name);
             printf("%s\n", entry->d_name);
         }
@@ -77,8 +81,10 @@ int main(int argc, char *argv[]) {
           return 1;
         }
 
+        int exitFlag = 0;
         // Main command processing loop
-        while (1) {
+        while (!exitFlag) {
+          printf("while");
           unsigned int event_id, delay;
           size_t num_rows, num_columns, num_coords;
           size_t xs[MAX_RESERVATION_SIZE], ys[MAX_RESERVATION_SIZE];
@@ -87,6 +93,7 @@ int main(int argc, char *argv[]) {
           //fflush(stdout);
 
           switch (get_next(fd_input)) {
+            
             case CMD_CREATE:
               // Process create command
               if (parse_create(fd_input, &event_id, &num_rows, &num_columns) != 0) {
@@ -169,9 +176,16 @@ int main(int argc, char *argv[]) {
             case EOC:
               // Terminate the program
               ems_terminate();
-              return 0;
+              close(fd_input);
+              exitFlag = 1;
+              break;
+              //closedir(dir);
+              //return 0;
           }
         }
+
+        //ems_terminate();
+        //close(fd_input);
 
         // Restore the standard input
         if (dup2(saved_stdin, STDIN_FILENO) == -1) {
@@ -180,7 +194,7 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        close(fd_input);
+        //close(fd_input);
   }
   closedir(dir);
   return 0;
