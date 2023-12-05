@@ -104,7 +104,7 @@ int main(int argc, char *argv[]) {
         int exitFlag = 0;
         while (!exitFlag) {
 
-           fflush(stdout);
+          // fflush(stdout);
 
           unsigned int event_id, delay;
           size_t num_rows, num_columns, num_coords;
@@ -197,6 +197,7 @@ int main(int argc, char *argv[]) {
               exitFlag = 1;
               break;
           }
+          fflush(stdout);
         }
 
         // Restore the standard input and output
