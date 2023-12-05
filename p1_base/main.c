@@ -41,10 +41,11 @@ int main(int argc, char *argv[]) {
   strcat(dirPath,argv[1]);
   strcat(dirPath,"/");
 
+  fflush(stdout);
+
   // Read the directory
   while ((entry = readdir(dir)) != NULL) {
 
-    //fflush(stdout);
     
     char currentPath[MAX_PATH_LENGTH];
     char currentPath2[MAX_PATH_LENGTH];
@@ -100,11 +101,11 @@ int main(int argc, char *argv[]) {
           return 1;
         }
 
+        fflush(stdout);
+
         // Main command processing loop
         int exitFlag = 0;
         while (!exitFlag) {
-
-          // fflush(stdout);
 
           unsigned int event_id, delay;
           size_t num_rows, num_columns, num_coords;
@@ -165,7 +166,7 @@ int main(int argc, char *argv[]) {
               }
 
               if (delay > 0) {
-                printf("Waiting...\n");
+                fprintf(stdout,"Waiting...\n");
                 ems_wait(delay);
               }
               break;
@@ -176,7 +177,7 @@ int main(int argc, char *argv[]) {
 
             case CMD_HELP:
               // Display help information
-              printf(
+              fprintf(stdout,
                   "Available commands:\n"
                   "  CREATE <event_id> <num_rows> <num_columns>\n"
                   "  RESERVE <event_id> [(<x1>,<y1>) (<x2>,<y2>) ...]\n"
@@ -212,9 +213,12 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
+        fflush(stdout);
+
         // Close the files
         close(fd_input);
         close(fd_output);
+
       }
   }
   closedir(dir);

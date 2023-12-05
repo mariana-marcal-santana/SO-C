@@ -58,6 +58,9 @@ int main(int argc, char *argv[]) {
 
   unsigned int num_child_processes = 0; 
   
+  fflush(stdout);
+
+  // Read the directory
   while ((entry=readdir(dir) )!= NULL) {
     
     if (strcmp(entry->d_name + strlen(entry->d_name) - 5, ".jobs") == 0) {
@@ -65,15 +68,15 @@ int main(int argc, char *argv[]) {
       if (num_child_processes < max_processes){
       
         pid_t pid = fork() ;
-      
+        num_child_processes++;
+
         if (pid == -1){
           fprintf(stderr, "Error creating child process\n");
-          return 1;
+          num_child_processes--;
+          exit(EXIT_FAILURE);
         }
         else if (pid == 0){
           
-          num_child_processes++;
-        
           char currentPath[MAX_PATH_LENGTH];
           char currentPath2[MAX_PATH_LENGTH];
 
@@ -126,11 +129,11 @@ int main(int argc, char *argv[]) {
             return 1;
           }
 
+          fflush(stdout);
+
           // Main command processing loop
           int exitFlag = 0;
           while (!exitFlag) {
-
-            // fflush(stdout); 
 
             unsigned int event_id, delay;
             size_t num_rows, num_columns, num_coords;
@@ -191,7 +194,7 @@ int main(int argc, char *argv[]) {
                 }
 
                 if (delay > 0) {
-                  printf("Waiting...\n");
+                  fprintf(stdout,"Waiting...\n");
                   ems_wait(delay);
                 }
                 break;
@@ -202,7 +205,7 @@ int main(int argc, char *argv[]) {
 
               case CMD_HELP:
                 // Display help information
-                printf(
+                fprintf(stdout,
                     "Available commands:\n"
                     "  CREATE <event_id> <num_rows> <num_columns>\n"
                     "  RESERVE <event_id> [(<x1>,<y1>) (<x2>,<y2>) ...]\n"
@@ -238,15 +241,16 @@ int main(int argc, char *argv[]) {
             continue;
           }
 
+          fflush(stdout);
+
           // Close the files
           close(fd_input);
           close(fd_output);
-          num_child_processes--;
           exit(EXIT_SUCCESS);
         }
       }
       if ( num_child_processes == max_processes){
-        fprintf(stderr, "Maximum number of processes reached\n");
+        num_child_processes=0;
         wait(NULL);
       }
     }

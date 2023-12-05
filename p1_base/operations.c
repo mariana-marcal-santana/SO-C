@@ -181,6 +181,7 @@ int ems_show(unsigned int event_id) {
     }
 
     fprintf(stdout,"\n");
+    fflush(stdout);
   }
 
   return 0;
@@ -193,17 +194,17 @@ int ems_list_events() {
   }
 
   if (event_list->head == NULL) {
-    printf("No events\n");
+    fprintf(stdout,"No events\n");
     return 0;
   }
 
   struct ListNode* current = event_list->head;
   while (current != NULL) {
-    printf("Event: ");
-    printf("%u\n", (current->event)->id);
+    fprintf(stdout,"Event: ");
+    fprintf(stdout,"%u\n", (current->event)->id);
     current = current->next;
   }
-
+  fflush(stdout);
   return 0;
 }
 
