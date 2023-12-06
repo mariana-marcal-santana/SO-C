@@ -11,6 +11,10 @@
 #include "dirent.h"
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <semaphore.h>
+
 
 int main(int argc, char *argv[]) {
 
@@ -56,26 +60,56 @@ int main(int argc, char *argv[]) {
   strcat(dirPath,argv[1]);
   strcat(dirPath,"/");
 
-  unsigned int num_child_processes = 0; 
-  
+  key_t key = ftok("/tmp", 'A');
+    if (key == -1) {
+        perror("ftok");
+        exit(EXIT_FAILURE);
+    }
+
+  // Criar a memória compartilhada
+  int shmid = shmget(key, SHM_SIZE, IPC_CREAT | 0666);
+  if (shmid == -1) {
+      perror("shmget");
+      exit(EXIT_FAILURE);
+  }
+
+  // Anexar a memória compartilhada ao espaço de endereçamento do processo
+  unsigned *n_childs = (unsigned *)shmat(shmid, NULL, 0);
+  if (n_childs == (unsigned *)(-1)) {
+      perror("shmat");
+      exit(EXIT_FAILURE);
+  }
+  *n_childs = 0;
+
+
+  sem_t semaphore;
+  if (sem_init(&semaphore, 0 , max_processes) == -1) {
+      perror("sem_init");
+      exit(EXIT_FAILURE);
+  }
   fflush(stdout);
 
   // Read the directory
   while ((entry=readdir(dir) )!= NULL) {
     
     if (strcmp(entry->d_name + strlen(entry->d_name) - 5, ".jobs") == 0) {
-    
-      if (num_child_processes < max_processes){
-      
+      printf("1\n");
+      sem_wait(&semaphore); // wait for a child to finish
+      printf("2\n");
+      if ( *n_childs < max_processes){
+        
         pid_t pid = fork() ;
-        num_child_processes++;
 
         if (pid == -1){
           fprintf(stderr, "Error creating child process\n");
-          num_child_processes--;
+          (*n_childs)--;
           exit(EXIT_FAILURE);
         }
+
         else if (pid == 0){
+          
+          __sync_fetch_and_add(n_childs, 1);
+          sem_post(&semaphore); // release the semaphore
           
           char currentPath[MAX_PATH_LENGTH];
           char currentPath2[MAX_PATH_LENGTH];
@@ -246,12 +280,14 @@ int main(int argc, char *argv[]) {
           // Close the files
           close(fd_input);
           close(fd_output);
+          __sync_fetch_and_sub(n_childs, 1);
           exit(EXIT_SUCCESS);
         }
       }
-      if ( num_child_processes == max_processes){
-        num_child_processes=0;
+      if ( *n_childs == max_processes){
+        printf("3\n");
         wait(NULL);
+        printf("4\n");
       }
     }
   }
