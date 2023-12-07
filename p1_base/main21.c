@@ -86,8 +86,6 @@ int main(int argc, char *argv[]) {
     }
 
     // Create a semaphore
-
-    printf("MAX PROCESSES: %d\n", max_processes);
     if (sem_init(semaphore, 1 , max_processes) == -1) {
         perror("sem_init");
         exit(EXIT_FAILURE);
@@ -286,7 +284,16 @@ int main(int argc, char *argv[]) {
             }
         }
     }
-    wait(NULL);
+    pid_t wpid;
+    int status ;
+    while ((wpid = waitpid(-1, &status, 0)) != -1){
+        if (WIFEXITED(status)){
+            continue;   
+        }
+        else{
+            printf("Child %d terminated abnormally\n", wpid);
+        }
+    }
     sem_destroy(semaphore);
     closedir(dir);
     return 0;
