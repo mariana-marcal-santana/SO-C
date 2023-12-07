@@ -103,8 +103,9 @@ int main(int argc, char *argv[]) {
 
         fflush(stdout);
 
+        ems_process(fd_input);
         // Main command processing loop
-        int exitFlag = 0;
+        /*int exitFlag = 0;
         while (!exitFlag) {
 
           unsigned int event_id, delay;
@@ -199,7 +200,7 @@ int main(int argc, char *argv[]) {
               break;
           }
           fflush(stdout);
-        }
+        }*/
 
         // Restore the standard input and output
         if (dup2(saved_stdin, STDIN_FILENO) == -1) {
