@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include "constants.h"
+#include "ems_operations.h"
 #include "operations.h"
 #include "parser.h"
 #include "dirent.h"
@@ -14,8 +15,6 @@
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
-
-
 
 int main(int argc, char *argv[]) {
 
@@ -34,7 +33,7 @@ int main(int argc, char *argv[]) {
         state_access_delay_ms = (unsigned int)delay;
     }
   
-    // 
+    // Set the maximum number of processes
     if (argc > 2) {
         char *endptr;
         unsigned long int proc = strtoul(argv[2], &endptr, 10);
@@ -57,28 +56,27 @@ int main(int argc, char *argv[]) {
     fflush(stdout);
 
     // Set the path to the provided directory
-    struct dirent *entry;
     char dirPath[MAX_PATH_LENGTH];
     getcwd(dirPath, sizeof(dirPath));
     strcat(dirPath,"/");
     strcat(dirPath,argv[1]);
     strcat(dirPath,"/");
     
-
+    // Create a key
     key_t key = ftok("/tmp", 'A');
     if (key == -1) {
         perror("ftok");
         exit(EXIT_FAILURE);
     }
 
-    // Criar a memória compartilhada
+    // Create a shared memory segment
     int shmid = shmget(key, SHM_SIZE, IPC_CREAT | 0666);
     if (shmid == -1) {
       perror("shmget");
       exit(EXIT_FAILURE);
     }
 
-    // Anexar a memória compartilhada ao espaço de endereçamento do processo
+    // Link shared memory to the process address space
     sem_t *semaphore = (sem_t *)shmat(shmid, NULL, 0);
     if (semaphore == (sem_t *)(-1)) {
       perror("shmat");
@@ -91,7 +89,8 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
     // Read the directory
-    while ((entry=readdir(dir) )!= NULL) {
+    struct dirent *entry;
+    while ((entry = readdir(dir))!= NULL) {
 
         if (strcmp(entry->d_name + strlen(entry->d_name) - 5, ".jobs") == 0) {
 
@@ -108,21 +107,21 @@ int main(int argc, char *argv[]) {
             }
             else if (pid == 0) {
                 // Child process
-                char currentPath[MAX_PATH_LENGTH];
-                char currentPath2[MAX_PATH_LENGTH];
+                char currentPathIn[MAX_PATH_LENGTH];
+                char currentPathOut[MAX_PATH_LENGTH];
         
                 // Set the path to the file
-                strcpy(currentPath, dirPath);
-                strcat(currentPath, entry->d_name);
+                strcpy(currentPathIn, dirPath);
+                strcat(currentPathIn, entry->d_name);
 
                 int saved_stdin = dup(STDIN_FILENO);
                 int saved_stdout = dup(STDOUT_FILENO);
 
                 // Open the file
-                int fd_input = open(currentPath, O_RDONLY);
+                int fd_input = open(currentPathIn, O_RDONLY);
                 if (fd_input == -1) {
                     perror("Failed to open input file");
-                    fprintf(stderr, "File name: %s\n", currentPath);
+                    fprintf(stderr, "File name: %s\n", currentPathIn);
                     continue;
                 }
 
@@ -131,11 +130,11 @@ int main(int argc, char *argv[]) {
                 strcpy(output_filename, entry->d_name);
                 strncpy(output_filename + strlen(output_filename) - 5, ".out", 5);
                 output_filename[strlen(entry->d_name)] = '\0';
-                strcpy(currentPath2, dirPath);
-                strcat(currentPath2, output_filename);
+                strcpy(currentPathOut, dirPath);
+                strcat(currentPathOut, output_filename);
 
                 // Open the output file
-                int fd_output = open(currentPath2, O_WRONLY | O_CREAT | O_TRUNC, S_IWUSR | S_IRUSR);
+                int fd_output = open(currentPathOut, O_WRONLY | O_CREAT | O_TRUNC, S_IWUSR | S_IRUSR);
                 if (fd_output == -1) {
                     perror("Failed to open output file");
                     fprintf(stderr, "File name: %s\n", output_filename);
@@ -143,43 +142,20 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
 
-                // Redirect the standard input and output
-                if (dup2(fd_output, STDOUT_FILENO) == -1) {
-                    perror("Failed to redirect stdout");
-                    close(fd_output);
-                    continue;
-                }
-                if (dup2(fd_input, STDIN_FILENO) == -1) {
-                    perror("Failed to redirect stdin");
-                    close(fd_input);
-                    continue;
-                }
                 // Initialize the event management system
                 if (ems_init(state_access_delay_ms)) {
                     fprintf(stderr, "Failed to initialize EMS\n");
                     return 1;
                 }
 
-                fflush(stdout);
-
-                ems_process(fd_input);
-
+                // Redirect the standard input and output
+                redirectStdinStdout(fd_input, fd_output, saved_stdin, saved_stdout, "FD");
+                // Process the commands
+                ems_process(fd_input, fd_output);
                 // Restore the standard input and output
-                if (dup2(saved_stdin, STDIN_FILENO) == -1) {
-                    perror("Failed to restore stdin");
-                    close(fd_input);
-                    continue;
-                }
-                if (dup2(saved_stdout, STDOUT_FILENO) == -1) {
-                    perror("Failed to restore stdout");
-                    close(fd_output);
-                    continue;
-                }
-
-                fflush(stdout);
+                redirectStdinStdout(fd_input, fd_output, saved_stdin, saved_stdout, "STD");
 
                 sem_post(semaphore);
-
                 shmdt(semaphore);
                 // Close the files
                 close(fd_input);
@@ -192,7 +168,7 @@ int main(int argc, char *argv[]) {
     int status ;
     while ((wpid = waitpid(-1, &status, 0)) != -1){
         if (WIFEXITED(status)){
-            continue;   
+            continue;  
         }
         else{
             printf("Child %d terminated abnormally\n", wpid);

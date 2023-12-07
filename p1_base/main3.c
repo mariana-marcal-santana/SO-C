@@ -6,7 +6,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include "constants.h"
-#include "operations.h"
+#include "ems_operations.h"
 #include "parser.h"
 #include "dirent.h"
 #include <sys/types.h>
