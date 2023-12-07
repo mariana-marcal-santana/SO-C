@@ -11,6 +11,10 @@
 #include "dirent.h"
 #include <sys/wait.h>
 #include <semaphore.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
 
 
 int main(int argc, char *argv[]) {
@@ -59,27 +63,44 @@ int main(int argc, char *argv[]) {
     strcat(dirPath,"/");
     strcat(dirPath,argv[1]);
     strcat(dirPath,"/");
+    
 
-    // Create a semaphore
-    sem_t semaphore;
-
-    printf("MAX PROCESSES: %d\n", max_processes);
-    if (sem_init(&semaphore, 1 , 5 ) == -1) {
-        perror("Error creating semaphore");
+    key_t key = ftok("/tmp", 'A');
+    if (key == -1) {
+        perror("ftok");
         exit(EXIT_FAILURE);
     }
-    int sem_value1;
-    printf("Value of semaphore1: %d\n", sem_getvalue(&semaphore, &sem_value1));
 
+    // Criar a memória compartilhada
+    int shmid = shmget(key, SHM_SIZE, IPC_CREAT | 0666);
+    if (shmid == -1) {
+      perror("shmget");
+      exit(EXIT_FAILURE);
+    }
+
+    // Anexar a memória compartilhada ao espaço de endereçamento do processo
+    sem_t *semaphore = (sem_t *)shmat(shmid, NULL, 0);
+    if (semaphore == (sem_t *)(-1)) {
+      perror("shmat");
+      exit(EXIT_FAILURE);
+    }
+
+    // Create a semaphore
+
+    printf("MAX PROCESSES: %d\n", max_processes);
+    if (sem_init(semaphore, 1 , max_processes) == -1) {
+        perror("sem_init");
+        exit(EXIT_FAILURE);
+    }
     // Read the directory
     while ((entry=readdir(dir) )!= NULL) {
 
         if (strcmp(entry->d_name + strlen(entry->d_name) - 5, ".jobs") == 0) {
-            
-            int sem_value;
-            printf("Value of semaphore: %d\n", sem_getvalue(&semaphore, &sem_value));
-            
-            sem_wait(&semaphore);
+
+            if (sem_wait(semaphore) == -1) {
+                perror("Error waiting on semaphore");
+                exit(EXIT_FAILURE);
+            }
 
             pid_t pid = fork() ;
 
@@ -88,9 +109,10 @@ int main(int argc, char *argv[]) {
                 exit(EXIT_FAILURE);
             }
             else if (pid == 0) {
+                // Child process
                 char currentPath[MAX_PATH_LENGTH];
                 char currentPath2[MAX_PATH_LENGTH];
-
+        
                 // Set the path to the file
                 strcpy(currentPath, dirPath);
                 strcat(currentPath, entry->d_name);
@@ -254,15 +276,18 @@ int main(int argc, char *argv[]) {
 
                 fflush(stdout);
 
+                sem_post(semaphore);
+
+                shmdt(semaphore);
                 // Close the files
                 close(fd_input);
                 close(fd_output);
                 exit(EXIT_SUCCESS);
             }
-            sem_post(&semaphore);
         }
     }
-    sem_destroy(&semaphore);
+    wait(NULL);
+    sem_destroy(semaphore);
     closedir(dir);
     return 0;
 }
