@@ -163,17 +163,29 @@ int main(int argc, char *argv[]) {
                 exit(EXIT_SUCCESS);
             }
         }
-    }
-    pid_t wpid;
-    int status ;
-    while ((wpid = waitpid(-1, &status, 0)) != -1){
-        if (WIFEXITED(status)){
-            continue;  
+        pid_t child_pid;
+        int status;
+
+        child_pid = waitpid(-1, &status, WNOHANG);
+
+        if (child_pid > 0) {
+            if (WIFEXITED(status)) {
+                printf("Child %d terminated normally with status: %d\n", child_pid, WEXITSTATUS(status));
+                fflush(stdout);
+            }
+            else {
+                printf("Child %d terminated abnormally\n", child_pid);
+            }
         }
-        else{
-            printf("Child %d terminated abnormally\n", wpid);
+        else if (child_pid == 0) {
+            // No child has terminated
+        }
+        else {
+            perror("waitpid");
+            exit(EXIT_FAILURE);
         }
     }
+    
     sem_destroy(semaphore);
     closedir(dir);
     return 0;
