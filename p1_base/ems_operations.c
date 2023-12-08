@@ -1,15 +1,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-
 #include <sys/types.h>
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
+
+#include "pthread.h"
 #include "eventlist.h"
 #include "constants.h"
 #include "parser.h"
 #include "operations.h"
+#include "ems_operations.h"
 
 static struct EventList* event_list = NULL;
 static unsigned int state_access_delay_ms = 0;
@@ -181,7 +183,7 @@ int ems_show(unsigned int event_id, int fd_output) {
     for (size_t j = 1; j <= event->cols; j++) {
 
       unsigned int* seat = get_seat_with_delay(event, seat_index(event, i, j));
-      char* seat_str = malloc(sizeof(char) * 10);
+      char* seat_str = malloc(sizeof(char));
       sprintf(seat_str, "%u", *seat);
       write(fd_output, seat_str, strlen(seat_str));
       free(seat_str);
@@ -328,4 +330,127 @@ void ems_process(int fd_input, int fd_output) {
     }
     fflush(stdout);
   }
+}
+
+void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_threads) {
+
+  int exitFlag = 0;
+  while (!exitFlag) {
+
+    struct ThreadArgs *args = (struct ThreadArgs *)malloc(sizeof(struct ThreadArgs));
+    args->fd_input = fd_input;
+    args->fd_output = fd_output;
+
+    /*unsigned int event_id, delay;
+    size_t num_rows, num_columns, num_coords;
+    size_t xs[MAX_RESERVATION_SIZE], ys[MAX_RESERVATION_SIZE];*/
+
+    pthread_t threads[num_threads];
+
+    for (unsigned int i = 0; i < num_threads; i++) {
+      if (pthread_create(&threads[i], NULL, &ems_process_thread, (void*)args) == 0) {}
+    }
+
+    for (unsigned int i = 0; i < num_threads; i++) {
+      if (pthread_join(threads[i], NULL) == 0) {}
+    }
+    
+    free(args);
+    fflush(stdout);
+  }
+}
+
+void * ems_process_thread(void *arg) {
+
+  struct ThreadArgs *args = (struct ThreadArgs *)arg;
+
+  switch (get_next(args->fd_input)) {
+      
+      case CMD_CREATE:
+        // Process create command
+        if (parse_create(args->fd_input, &args->event_id, &args->num_rows, &args->num_columns) != 0) {
+          fprintf(stderr, "Invalid CREATE command. See HELP for usage\n");
+          //continue;
+        }
+
+        if (ems_create(args->event_id, args->num_rows, args->num_columns)) {
+          fprintf(stderr, "Failed to create event\n");
+        }
+        break;
+
+      case CMD_RESERVE:
+        // Process reserve command
+        args->num_coords = parse_reserve(args->fd_input, MAX_RESERVATION_SIZE, &args->event_id, args->xs, args->ys);
+
+        if (args->num_coords == 0) {
+          fprintf(stderr, "Invalid RESERVE command. See HELP for usage\n");
+          //continue;
+        }
+
+        if (ems_reserve(args->event_id, args->num_coords, args->xs, args->ys)) {
+          fprintf(stderr, "Failed to reserve seats\n");
+        }
+        break;
+
+      case CMD_SHOW:
+        // Process show command
+        if (parse_show(args->fd_input, &args->event_id) != 0) {
+          fprintf(stderr, "Invalid SHOW command. See HELP for usage\n");
+          //continue;
+        }
+
+        if (ems_show(args->event_id, args->fd_output)) {
+          fprintf(stderr, "Failed to show event\n");
+        }
+        break;
+
+      case CMD_LIST_EVENTS:
+        // Process list events command
+        if (ems_list_events(args->fd_output)) {
+          fprintf(stderr, "Failed to list events\n");
+        }
+        break;
+
+      case CMD_WAIT:
+        // Process wait command
+        if (parse_wait(args->fd_input, &args->delay, NULL) == -1) {
+          fprintf(stderr, "Invalid WAIT command. See HELP for usage\n");
+          //continue;
+        }
+
+        if (args->delay > 0) {
+          write(args->fd_output,"Waiting...\n", 11);
+          ems_wait(args->delay);
+        }
+        break;
+
+      case CMD_INVALID:
+        fprintf(stderr, "Invalid command. See HELP for usage\n");
+        break;
+
+      case CMD_HELP:
+        // Display help information
+        fprintf(stderr,
+            "Available commands:\n"
+            "  CREATE <event_id> <num_rows> <num_columns>\n"
+            "  RESERVE <event_id> [(<x1>,<y1>) (<x2>,<y2>) ...]\n"
+            "  SHOW <event_id>\n"
+            "  LIST\n"
+            "  WAIT <delay_ms> [thread_id]\n"  // thread_id is not implemented
+            "  BARRIER\n"                      // Not implemented
+            "  HELP\n");
+        break;
+
+      case CMD_BARRIER:  // Not implemented
+      case CMD_EMPTY:
+        break;
+
+      case EOC:
+        // Terminate the program
+        ems_terminate();
+        return (void*) 1;
+        //exitFlag = 1;
+        break;
+    }
+    return (void*) 0;
 }

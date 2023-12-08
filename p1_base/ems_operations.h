@@ -28,8 +28,9 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys)
 
 /// Prints the given event.
 /// @param event_id Id of the event to print.
+/// @param fd_output File descriptor to write the output to.
 /// @return 0 if the event was printed successfully, 1 otherwise.
-int ems_show(unsigned int event_id);
+int ems_show(unsigned int event_id, int fd_output);
 
 /// Prints all the events.
 /// @return 0 if the events were printed successfully, 1 otherwise.
@@ -41,6 +42,16 @@ void ems_wait(unsigned int delay_ms);
 
 /// Processes the commands from the given file descriptor.
 /// @param fd_input File descriptor to read the commands from.
-void ems_process(int fd_input);
+/// @param fd_output File descriptor to write the output to.
+void ems_process(int fd_input, int fd_output);
+
+/// Processes the commands from the given file descriptor using threads.
+/// @param fd_input File descriptor to read the commands from.
+/// @param fd_output File descriptor to write the output to.
+/// @param max_threads Maximum number of threads to use.
+void ems_process_with_threads(int fd_input, int fd_output, unsigned int max_threads);
+
+
+void *ems_process_thread(void * args);
 
 #endif  // EMS_OPERATIONS_H

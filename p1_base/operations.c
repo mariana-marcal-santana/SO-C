@@ -4,6 +4,8 @@
 
 #include "constants.h"
 
+
+
 void redirectStdinStdout(int fd_input, int fd_output, int saved_stdin, int saved_stdout, char *flag) {
     if (strcmp(flag, "FD") == 0) {
         if (dup2(fd_output, STDOUT_FILENO) == -1) {
@@ -28,15 +30,5 @@ void redirectStdinStdout(int fd_input, int fd_output, int saved_stdin, int saved
             close(fd_output);
             return;
         }
-    }
-}
-
-
-
-void writeToFile(int fd_output, char *str) {
-    if (write(fd_output, str, strlen(str)) == -1) {
-        perror("Failed to write to file");
-        close(fd_output);
-        return;
     }
 }
