@@ -155,7 +155,7 @@ int main(int argc, char *argv[]) {
           // Redirect the standard input and output
           redirectStdinStdout(fd_input, fd_output, saved_stdin, saved_stdout, "FD");
           // Process the commands
-          ems_process(fd_input, fd_output);
+          ems_process(fd_input);
           // Restore the standard input and output
           redirectStdinStdout(fd_input, fd_output, saved_stdin, saved_stdout, "STD");
 
