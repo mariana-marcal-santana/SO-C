@@ -19,7 +19,7 @@
 int main(int argc, char *argv[]) {
 
     unsigned int state_access_delay_ms = STATE_ACCESS_DELAY_MS;
-    unsigned int max_processes = 1;
+    unsigned int max_proc = MAX_PROC ;
     
     // Check if a delay is provided
     if (argc > 3) {
@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Invalid number of processes\n");
         return 1;
         }
-        max_processes = (unsigned int)proc;
+        max_proc = (unsigned int)proc;
     }
 
 
@@ -81,10 +81,10 @@ int main(int argc, char *argv[]) {
     if (semaphore == (sem_t *)(-1)) {
       perror("shmat");
       exit(EXIT_FAILURE);
-    }
+    }   
 
     // Create a semaphore
-    if (sem_init(semaphore, 1 , max_processes) == -1) {
+    if (sem_init(semaphore, 1 , max_proc) == -1) {
         perror("sem_init");
         exit(EXIT_FAILURE);
     }
@@ -94,18 +94,19 @@ int main(int argc, char *argv[]) {
 
         if (strcmp(entry->d_name + strlen(entry->d_name) - 5, ".jobs") == 0) {
 
+            // Wait for a process to finish
             if (sem_wait(semaphore) == -1) {
                 perror("Error waiting on semaphore");
                 exit(EXIT_FAILURE);
             }
 
-            pid_t pid = fork() ;
-
-            if (pid == -1){
-                fprintf(stderr, "Error creating child process\n");
+            pid_t pid = fork();
+            if (pid == -1) {
+                perror("Failed to fork");
                 exit(EXIT_FAILURE);
             }
             else if (pid == 0) {
+                     
                 // Child process
                 char currentPathIn[MAX_PATH_LENGTH];
                 char currentPathOut[MAX_PATH_LENGTH];
@@ -163,29 +164,11 @@ int main(int argc, char *argv[]) {
                 exit(EXIT_SUCCESS);
             }
         }
-        pid_t child_pid;
-        int status;
-
-        child_pid = waitpid(-1, &status, WNOHANG);
-
-        if (child_pid > 0) {
-            if (WIFEXITED(status)) {
-                printf("Child %d terminated normally with status: %d\n", child_pid, WEXITSTATUS(status));
-                fflush(stdout);
-            }
-            else {
-                printf("Child %d terminated abnormally\n", child_pid);
-            }
-        }
-        else if (child_pid == 0) {
-            // No child has terminated
-        }
-        else {
-            perror("waitpid");
-            exit(EXIT_FAILURE);
-        }
     }
-    
+    // Wait for all the processes to finish
+    while (wait(NULL) != -1) {
+        continue;
+    }
     sem_destroy(semaphore);
     closedir(dir);
     return 0;

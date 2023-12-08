@@ -164,7 +164,7 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
   return 0;
 }
 
-int ems_show(unsigned int event_id) {
+int ems_show(unsigned int event_id, int fd_output) {
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
     return 1;
@@ -179,36 +179,46 @@ int ems_show(unsigned int event_id) {
 
   for (size_t i = 1; i <= event->rows; i++) {
     for (size_t j = 1; j <= event->cols; j++) {
+
       unsigned int* seat = get_seat_with_delay(event, seat_index(event, i, j));
-      fprintf(stdout,"%u", *seat);
+      char* seat_str = malloc(sizeof(char) * 10);
+      sprintf(seat_str, "%u", *seat);
+      write(fd_output, seat_str, strlen(seat_str));
+      free(seat_str);
 
       if (j < event->cols) {
-        fprintf(stdout," ");
+        write(fd_output, " ", 1);
       }
     }
 
-    fprintf(stdout,"\n");
+    write(fd_output, "\n", 1);
     fflush(stdout);
   }
 
   return 0;
 }
 
-int ems_list_events() {
+int ems_list_events(int fd_output) {
   if (event_list == NULL) {
-    fprintf(stdout, "EMS state must be initialized\n");
+    fprintf(stderr, "EMS state must be initialized\n");
     return 1;
   }
 
   if (event_list->head == NULL) {
-    fprintf(stdout,"No events\n");
+    fprintf(stderr,"No events\n");
     return 0;
   }
 
   struct ListNode* current = event_list->head;
   while (current != NULL) {
-    fprintf(stdout,"Event: ");
-    fprintf(stdout,"%u\n", (current->event)->id);
+  
+    write(fd_output, "Event: ", 7);
+    
+    char *id = malloc(sizeof(char)*10);
+    sprintf(id, "%u\n", (current->event)->id);
+    write(fd_output, id, strlen(id));
+    free(id);
+    
     current = current->next;
   }
   fflush(stdout);
@@ -220,7 +230,7 @@ void ems_wait(unsigned int delay_ms) {
   nanosleep(&delay, NULL);
 }
 
-void ems_process(int fd_input) {
+void ems_process(int fd_input, int fd_output) {
 
   int exitFlag = 0;
   while (!exitFlag) {
@@ -264,14 +274,14 @@ void ems_process(int fd_input) {
           continue;
         }
 
-        if (ems_show(event_id)) {
+        if (ems_show(event_id, fd_output)) {
           fprintf(stderr, "Failed to show event\n");
         }
         break;
 
       case CMD_LIST_EVENTS:
         // Process list events command
-        if (ems_list_events()) {
+        if (ems_list_events(fd_output)) {
           fprintf(stderr, "Failed to list events\n");
         }
         break;
@@ -284,7 +294,7 @@ void ems_process(int fd_input) {
         }
 
         if (delay > 0) {
-          fprintf(stdout,"Waiting...\n");
+          write(fd_output,"Waiting...\n", 11);
           ems_wait(delay);
         }
         break;
