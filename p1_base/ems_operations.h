@@ -41,6 +41,6 @@ void ems_wait(unsigned int delay_ms);
 
 /// Processes the commands from the given file descriptor.
 /// @param fd_input File descriptor to read the commands from.
-void ems_process(int fd_input, int fd_output);
+void ems_process(int fd_input);
 
 #endif  // EMS_OPERATIONS_H

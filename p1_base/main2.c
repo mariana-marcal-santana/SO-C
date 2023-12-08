@@ -5,16 +5,15 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/wait.h>
+#include <semaphore.h>
+#include <sys/shm.h>
+
 #include "constants.h"
 #include "ems_operations.h"
 #include "operations.h"
 #include "parser.h"
 #include "dirent.h"
-#include <sys/wait.h>
-#include <semaphore.h>
-#include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/shm.h>
 
 int main(int argc, char *argv[]) {
 
@@ -151,22 +150,23 @@ int main(int argc, char *argv[]) {
                 // Redirect the standard input and output
                 redirectStdinStdout(fd_input, fd_output, saved_stdin, saved_stdout, "FD");
                 // Process the commands
-                ems_process(fd_input, fd_output);
+                ems_process(fd_input);
                 // Restore the standard input and output
                 redirectStdinStdout(fd_input, fd_output, saved_stdin, saved_stdout, "STD");
 
                 sem_post(semaphore);
                 shmdt(semaphore);
+
                 // Close the files
                 close(fd_input);
                 close(fd_output);
+
                 exit(EXIT_SUCCESS);
             }
         }
-        pid_t child_pid;
-        int status;
 
-        child_pid = waitpid(-1, &status, WNOHANG);
+        int status;
+        pid_t child_pid = waitpid(-1, &status, WNOHANG);
 
         if (child_pid > 0) {
             if (WIFEXITED(status)) {

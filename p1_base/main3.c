@@ -146,40 +146,18 @@ int main(int argc, char *argv[]) {
             continue;
           }
 
-          // Redirect the standard input and output
-          if (dup2(fd_output, STDOUT_FILENO) == -1) {
-              perror("Failed to redirect stdout");
-              close(fd_output);
-              continue;
-          }
-          if (dup2(fd_input, STDIN_FILENO) == -1) {
-              perror("Failed to redirect stdin");
-              close(fd_input);
-              continue;
-          }
           // Initialize the event management system
           if (ems_init(state_access_delay_ms)) {
             fprintf(stderr, "Failed to initialize EMS\n");
             return 1;
           }
-
-          fflush(stdout);
-
-          ems_process(fd_input);
-
+          
+          // Redirect the standard input and output
+          redirectStdinStdout(fd_input, fd_output, saved_stdin, saved_stdout, "FD");
+          // Process the commands
+          ems_process(fd_input, fd_output);
           // Restore the standard input and output
-          if (dup2(saved_stdin, STDIN_FILENO) == -1) {
-            perror("Failed to restore stdin");
-            close(fd_input);
-            continue;
-          }
-          if (dup2(saved_stdout, STDOUT_FILENO) == -1) {
-            perror("Failed to restore stdout");
-            close(fd_output);
-            continue;
-          }
-
-          fflush(stdout);
+          redirectStdinStdout(fd_input, fd_output, saved_stdin, saved_stdout, "STD");
 
           // Close the files
           close(fd_input);
