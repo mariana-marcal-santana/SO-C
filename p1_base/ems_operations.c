@@ -338,8 +338,8 @@ void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_thre
   pthread_t threads[num_threads];
   int *exitFlag = 0;
 
-  sem_t *thread_semaphore;
-  if (sem_init(thread_semaphore, 0, num_threads) == -1) {
+  sem_t thread_semaphore;
+  if (sem_init(&thread_semaphore, 0, num_threads) == -1) {
     perror("Error initializing semaphore");
     exit(EXIT_FAILURE);
   }
@@ -349,10 +349,10 @@ void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_thre
     struct ThreadArgs *args = (struct ThreadArgs *)malloc(sizeof(struct ThreadArgs));
     args->fd_input = fd_input;
     args->fd_output = fd_output;
-    args->thread_semaphore = thread_semaphore;
+    args->thread_semaphore = &thread_semaphore;
 
     if (pthread_create(&threads[0], NULL, &ems_process_thread, (void*)args) == 0) { 
-      sem_wait(thread_semaphore);
+      sem_wait(&thread_semaphore);
     }
 
     if (pthread_join(threads[0], (void **) &exitFlag) == 0) { continue; }
@@ -360,6 +360,7 @@ void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_thre
     free(args);
     fflush(stdout);
   }
+  sem_destroy(&thread_semaphore);
 }
 
 void * ems_process_thread(void *arg) {
