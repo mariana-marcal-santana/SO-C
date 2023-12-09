@@ -14,8 +14,13 @@
 #include "operations.h"
 #include "ems_operations.h"
 
+int exitFlag = 0;
+
 static struct EventList* event_list = NULL;
 static unsigned int state_access_delay_ms = 0;
+
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
 /// Calculates a timespec from a delay in milliseconds.
 /// @param delay_ms Delay in milliseconds.
@@ -233,7 +238,7 @@ void ems_wait(unsigned int delay_ms) {
   nanosleep(&delay, NULL);
 }
 
-void ems_process(int fd_input, int fd_output) {
+/*void ems_process(int fd_input, int fd_output) {
 
   int exitFlag = 0;
   while (!exitFlag) {
@@ -332,58 +337,75 @@ void ems_process(int fd_input, int fd_output) {
     fflush(stdout);
   }
 }
-
+*/
 void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_threads) {
-
-  pthread_t threads[num_threads];
-  int *exitFlag = 0;
-
-  sem_t thread_semaphore;
+  struct Pthread threads[num_threads];
+  
+  int id_thread = 1;
+  set_List_Pthreads(threads, num_threads);
+  /*sem_t thread_semaphore;
   if (sem_init(&thread_semaphore, 0, num_threads) == -1) {
     perror("Error initializing semaphore");
     exit(EXIT_FAILURE);
-  }
+  }*/
 
   while (!exitFlag) {
 
+    
     struct ThreadArgs *args = (struct ThreadArgs *)malloc(sizeof(struct ThreadArgs));
     args->fd_input = fd_input;
     args->fd_output = fd_output;
-    args->thread_semaphore = &thread_semaphore;
+    //args->thread_semaphore = &thread_semaphore;
+    
+    unsigned int index = get_free_Pthread_index(threads, num_threads);
 
-    if (pthread_create(&threads[0], NULL, &ems_process_thread, (void*)args) == 0) { 
-      sem_wait(&thread_semaphore);
+    if (index == num_threads+1) {
+      while (1){
+        fprintf(stderr, "Waiting for thread to finish\n");
+        pthread_cond_wait(&cond, &mutex);
+        break;  
+      }
     }
-
-    if (pthread_join(threads[0], (void **) &exitFlag) == 0) { continue; }
-
-    free(args);
+    else {
+      fprintf(stderr, "Thread %d created\n", id_thread);
+      threads[index].id = id_thread;
+      id_thread++;
+      if (pthread_create(threads[index].thread, NULL, &ems_process_thread, (void*)args) != 0) {
+        perror("Error creating thread");
+        exit(EXIT_FAILURE);
+      }
+    }
+    exitFlag = 0;
+    //free(args);
     fflush(stdout);
   }
-  sem_destroy(&thread_semaphore);
+  //sem_destroy(&thread_semaphore);
 }
 
 void * ems_process_thread(void *arg) {
-
-  int *return_value = malloc(sizeof(int));
-  *return_value = 0;
+  fprintf(stderr, "Thread \n");
+  pthread_mutex_lock(&mutex);
   struct ThreadArgs *args = (struct ThreadArgs *)arg;
+  fprintf(stderr ,"INPUT %d\n", args->fd_input);
+  fprintf(stderr ,"OUTPUT %d\n", args->fd_output);
 
   switch (get_next(args->fd_input)) {
-      
+
       case CMD_CREATE:
         // Process create command
+        fprintf(stderr, "Create\n");
         if (parse_create(args->fd_input, &args->event_id, &args->num_rows, &args->num_columns) != 0) {
           fprintf(stderr, "Invalid CREATE command. See HELP for usage\n");
           //continue;
         }
-
+        fprintf(stderr,"Event id: %d\n", args->event_id);
         if (ems_create(args->event_id, args->num_rows, args->num_columns)) {
           fprintf(stderr, "Failed to create event\n");
         }
         break;
 
       case CMD_RESERVE:
+        fprintf(stderr, "Reserve\n");
         // Process reserve command
         args->num_coords = parse_reserve(args->fd_input, MAX_RESERVATION_SIZE, &args->event_id, args->xs, args->ys);
 
@@ -453,9 +475,13 @@ void * ems_process_thread(void *arg) {
       case EOC:
         // Terminate the program
         ems_terminate();
-        *return_value = 1;
+        exitFlag = 1;
         break;
     }
-    sem_post(args->thread_semaphore);
-    return (void*) return_value;
+    printf("Thread finished\n");
+    //sem_post(args->thread_semaphore);
+    free(args);
+    pthread_cond_signal(&cond);
+    pthread_mutex_unlock(&mutex);
+    pthread_exit(NULL);
 }

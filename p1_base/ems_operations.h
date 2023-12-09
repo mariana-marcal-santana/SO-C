@@ -3,6 +3,8 @@
 
 #include <stddef.h>
 
+
+
 /// Initializes the EMS state.
 /// @param delay_ms State access delay in milliseconds.
 /// @return 0 if the EMS state was initialized successfully, 1 otherwise.
