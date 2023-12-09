@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
         fflush(stdout);
 
         // Process the file's commands
-        ems_process(fd_input);
+        ems_process(fd_input,fd_output);
 
         // Restore the standard input and output
         if (dup2(saved_stdin, STDIN_FILENO) == -1) {
