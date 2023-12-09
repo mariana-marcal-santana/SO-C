@@ -336,7 +336,7 @@ void ems_process(int fd_input, int fd_output) {
 void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_threads) {
 
   pthread_t threads[num_threads];
-  int exitFlag = 0;
+  int *exitFlag = 0;
 
   sem_t *thread_semaphore;
   if (sem_init(thread_semaphore, 0, num_threads) == -1) {
@@ -355,18 +355,8 @@ void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_thre
       sem_wait(thread_semaphore);
     }
 
-    
+    if (pthread_join(threads[0], (void **) &exitFlag) == 0) { continue; }
 
-
-
-    /*for (unsigned int i = 0; i < num_threads; i++) {
-      if (pthread_create(&threads[i], NULL, &ems_process_thread, (void*)args) == 0) {}
-    }
-
-    for (unsigned int i = 0; i < num_threads; i++) {
-      if (pthread_join(threads[i], NULL) == 0) {}
-    }*/
-    
     free(args);
     fflush(stdout);
   }
@@ -374,6 +364,8 @@ void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_thre
 
 void * ems_process_thread(void *arg) {
 
+  int *return_value = malloc(sizeof(int));
+  *return_value = 0;
   struct ThreadArgs *args = (struct ThreadArgs *)arg;
 
   switch (get_next(args->fd_input)) {
@@ -460,9 +452,9 @@ void * ems_process_thread(void *arg) {
       case EOC:
         // Terminate the program
         ems_terminate();
-        return (void*) 1;
-        //exitFlag = 1;
+        *return_value = 1;
         break;
     }
-    return (void*) 0;
+    sem_post(args->thread_semaphore);
+    return (void*) return_value;
 }
