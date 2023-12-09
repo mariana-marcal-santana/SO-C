@@ -14,13 +14,14 @@
 #include "operations.h"
 #include "ems_operations.h"
 
-int exitFlag = 0;
+//int exitFlag = 0;
 
 static struct EventList* event_list = NULL;
 static unsigned int state_access_delay_ms = 0;
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+int end_condition = 0;
 
 /// Calculates a timespec from a delay in milliseconds.
 /// @param delay_ms Delay in milliseconds.
@@ -189,7 +190,7 @@ int ems_show(unsigned int event_id, int fd_output) {
     for (size_t j = 1; j <= event->cols; j++) {
 
       unsigned int* seat = get_seat_with_delay(event, seat_index(event, i, j));
-      char* seat_str = malloc(sizeof(char));
+      char* seat_str = malloc(sizeof(char) * 2);
       sprintf(seat_str, "%u", *seat);
       write(fd_output, seat_str, strlen(seat_str));
       free(seat_str);
@@ -238,7 +239,7 @@ void ems_wait(unsigned int delay_ms) {
   nanosleep(&delay, NULL);
 }
 
-/*void ems_process(int fd_input, int fd_output) {
+void ems_process(int fd_input, int fd_output) {
 
   int exitFlag = 0;
   while (!exitFlag) {
@@ -337,21 +338,65 @@ void ems_wait(unsigned int delay_ms) {
     fflush(stdout);
   }
 }
-*/
+
 void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_threads) {
+
   struct Pthread threads[num_threads];
   
   int id_thread = 1;
   set_List_Pthreads(threads, num_threads);
-  /*sem_t thread_semaphore;
+
+  sem_t thread_semaphore;
   if (sem_init(&thread_semaphore, 0, num_threads) == -1) {
     perror("Error initializing semaphore");
     exit(EXIT_FAILURE);
-  }*/
+  }
+
+  int *exitFlag = 0;
+  while (!exitFlag) {
+    
+    struct ThreadArgs *args = (struct ThreadArgs *)malloc(sizeof(struct ThreadArgs));
+    args->fd_input = fd_input;
+    args->fd_output = fd_output;
+    args->thread_semaphore = &thread_semaphore;
+    args->pthread_list = threads;
+
+    if (sem_wait(&thread_semaphore) == -1) {
+      perror("Error waiting on semaphore");
+      exit(EXIT_FAILURE);
+    }
+
+    unsigned int index = get_free_Pthread_index(threads, num_threads);
+
+    threads[index].id = id_thread;
+    id_thread++;
+    if (pthread_create(threads[index].thread, NULL, &ems_process_thread, (void*)args) != 0) {
+      perror("Error creating thread");
+      exit(EXIT_FAILURE);
+    }
+
+    if (end_condition == 1) {
+      pthread_mutex_lock(&mutex);
+      pthread_join(*threads[index].thread, (void**) &exitFlag);
+      pthread_mutex_unlock(&mutex);      
+    }
+  }
+  free(exitFlag);
+}
+
+/*void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_threads) {
+  struct Pthread threads[num_threads];
+  
+  int id_thread = 1;
+  set_List_Pthreads(threads, num_threads);
+  sem_t thread_semaphore;
+  if (sem_init(&thread_semaphore, 0, num_threads) == -1) {
+    perror("Error initializing semaphore");
+    exit(EXIT_FAILURE);
+  }
 
   while (!exitFlag) {
 
-    
     struct ThreadArgs *args = (struct ThreadArgs *)malloc(sizeof(struct ThreadArgs));
     args->fd_input = fd_input;
     args->fd_output = fd_output;
@@ -380,14 +425,16 @@ void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_thre
     fflush(stdout);
   }
   //sem_destroy(&thread_semaphore);
-}
+}*/
 
 void * ems_process_thread(void *arg) {
-  fprintf(stderr, "Thread \n");
+
   pthread_mutex_lock(&mutex);
   struct ThreadArgs *args = (struct ThreadArgs *)arg;
-  fprintf(stderr ,"INPUT %d\n", args->fd_input);
-  fprintf(stderr ,"OUTPUT %d\n", args->fd_output);
+  end_condition = 0;
+
+  int* returnVal = malloc(sizeof(int));
+  *returnVal = 0;
 
   switch (get_next(args->fd_input)) {
 
@@ -475,13 +522,13 @@ void * ems_process_thread(void *arg) {
       case EOC:
         // Terminate the program
         ems_terminate();
-        exitFlag = 1;
+        returnVal = 1;
         break;
     }
-    printf("Thread finished\n");
-    //sem_post(args->thread_semaphore);
+    end_condition = 1;
+    sem_post(args->thread_semaphore);
     free(args);
-    pthread_cond_signal(&cond);
     pthread_mutex_unlock(&mutex);
-    pthread_exit(NULL);
+
+    return (void *) returnVal;
 }

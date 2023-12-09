@@ -4,6 +4,7 @@ struct ThreadArgs {
     size_t num_rows, num_columns, num_coords;
     size_t xs[MAX_RESERVATION_SIZE], ys[MAX_RESERVATION_SIZE];
     sem_t *thread_semaphore;
+    Pthread *pthread_list;
 };
 
 struct Pthread{
