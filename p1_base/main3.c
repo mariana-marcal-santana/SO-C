@@ -89,14 +89,14 @@ int main(int argc, char *argv[]) {
     }
 
     // Link shared memory to the process address space
-    sem_t *semaphore = (sem_t *)shmat(shmid, NULL, 0);
-    if (semaphore == (sem_t *)(-1)) {
+    sem_t *process_semaphore = (sem_t *)shmat(shmid, NULL, 0);
+    if (process_semaphore == (sem_t *)(-1)) {
       perror("shmat");
       exit(EXIT_FAILURE);
     }   
 
     // Create a semaphore
-    if (sem_init(semaphore, 1 , max_proc) == -1) {
+    if (sem_init(process_semaphore, 1 , max_proc) == -1) {
         perror("sem_init");
         exit(EXIT_FAILURE);
     }
@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
         if (strcmp(entry->d_name + strlen(entry->d_name) - 5, ".jobs") == 0) {
 
             // Wait for a process to finish
-            if (sem_wait(semaphore) == -1) {
+            if (sem_wait(process_semaphore) == -1) {
                 perror("Error waiting on semaphore");
                 exit(EXIT_FAILURE);
             }
@@ -169,8 +169,8 @@ int main(int argc, char *argv[]) {
                 // Restore the standard input and output
                 redirectStdinStdout(fd_input, fd_output, saved_stdin, saved_stdout, "STD");
 
-                sem_post(semaphore);
-                shmdt(semaphore);
+                sem_post(process_semaphore);
+                shmdt(process_semaphore);
 
                 // Close the files
                 close(fd_input);
@@ -184,7 +184,7 @@ int main(int argc, char *argv[]) {
     while (wait(NULL) != -1) {
         continue;
     }
-    sem_destroy(semaphore);
+    sem_destroy(process_semaphore);
     closedir(dir);
     return 0;
 }

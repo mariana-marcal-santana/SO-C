@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
+#include <semaphore.h>
 
 #include "pthread.h"
 #include "eventlist.h"
@@ -334,26 +335,37 @@ void ems_process(int fd_input, int fd_output) {
 
 void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_threads) {
 
+  pthread_t threads[num_threads];
   int exitFlag = 0;
+
+  sem_t *thread_semaphore;
+  if (sem_init(thread_semaphore, 0, num_threads) == -1) {
+    perror("Error initializing semaphore");
+    exit(EXIT_FAILURE);
+  }
+
   while (!exitFlag) {
 
     struct ThreadArgs *args = (struct ThreadArgs *)malloc(sizeof(struct ThreadArgs));
     args->fd_input = fd_input;
     args->fd_output = fd_output;
+    args->thread_semaphore = thread_semaphore;
 
-    /*unsigned int event_id, delay;
-    size_t num_rows, num_columns, num_coords;
-    size_t xs[MAX_RESERVATION_SIZE], ys[MAX_RESERVATION_SIZE];*/
+    if (pthread_create(&threads[0], NULL, &ems_process_thread, (void*)args) == 0) { 
+      sem_wait(thread_semaphore);
+    }
 
-    pthread_t threads[num_threads];
+    
 
-    for (unsigned int i = 0; i < num_threads; i++) {
+
+
+    /*for (unsigned int i = 0; i < num_threads; i++) {
       if (pthread_create(&threads[i], NULL, &ems_process_thread, (void*)args) == 0) {}
     }
 
     for (unsigned int i = 0; i < num_threads; i++) {
       if (pthread_join(threads[i], NULL) == 0) {}
-    }
+    }*/
     
     free(args);
     fflush(stdout);

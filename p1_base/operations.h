@@ -3,6 +3,7 @@ struct ThreadArgs {
     unsigned int event_id, delay;
     size_t num_rows, num_columns, num_coords;
     size_t xs[MAX_RESERVATION_SIZE], ys[MAX_RESERVATION_SIZE];
+    sem_t *thread_semaphore;
 };
 
 /// Redirects the standard input and output to the given file descriptors or vice versa.

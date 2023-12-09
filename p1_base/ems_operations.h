@@ -51,7 +51,9 @@ void ems_process(int fd_input, int fd_output);
 /// @param max_threads Maximum number of threads to use.
 void ems_process_with_threads(int fd_input, int fd_output, unsigned int max_threads);
 
-
+/// Processes each command from the given file descriptor in a separate thread.
+/// @param args (struct ThreadArgs *) Arguments for the thread.
+/// @return 
 void *ems_process_thread(void * args);
 
 #endif  // EMS_OPERATIONS_H
