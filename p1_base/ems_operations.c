@@ -361,23 +361,24 @@ void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_thre
     args->thread_semaphore = &thread_semaphore;
     args->pthread_list = threads;
 
-    if (sem_wait(&thread_semaphore) == -1) {
-      perror("Error waiting on semaphore");
-      exit(EXIT_FAILURE);
-    }
-
     unsigned int index = get_free_Pthread_index(threads, num_threads);
-
+    fprintf(stderr, "INDEX: %d\n", index);
     threads[index].id = id_thread;
     id_thread++;
     if (pthread_create(threads[index].thread, NULL, &ems_process_thread, (void*)args) != 0) {
       perror("Error creating thread");
       exit(EXIT_FAILURE);
     }
+    
+    if (sem_wait(&thread_semaphore) == -1) {
+      perror("Error waiting for semaphore");
+      exit(EXIT_FAILURE);
+    }
 
     if (end_condition == 1) {
       pthread_mutex_lock(&mutex);
       pthread_join(*threads[index].thread, (void**) &exitFlag);
+      remove_Pthread_list(threads, num_threads, threads[index].thread);
       pthread_mutex_unlock(&mutex);      
     }
   }
@@ -522,13 +523,12 @@ void * ems_process_thread(void *arg) {
       case EOC:
         // Terminate the program
         ems_terminate();
-        returnVal = 1;
+        *returnVal = 1;
         break;
     }
     end_condition = 1;
     sem_post(args->thread_semaphore);
     free(args);
     pthread_mutex_unlock(&mutex);
-
     return (void *) returnVal;
 }
