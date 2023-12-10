@@ -8,6 +8,7 @@
 #include <sys/wait.h>
 #include <semaphore.h>
 #include <sys/shm.h>
+#include <errno.h>
 
 #include "constants.h"
 #include "ems_operations.h"
@@ -90,14 +91,18 @@ int main(int argc, char *argv[]) {
     // Read the directory
     struct dirent *entry;
     while ((entry = readdir(dir))!= NULL) {
-
+        
+        verify_child_terminated();
+        
         if (strcmp(entry->d_name + strlen(entry->d_name) - 5, ".jobs") == 0) {
-
+            
             // Wait for a process to finish
             if (sem_wait(semaphore) == -1) {
                 perror("Error waiting on semaphore");
                 exit(EXIT_FAILURE);
             }
+            
+            verify_child_terminated();
 
             pid_t pid = fork();
             if (pid == -1) {
@@ -164,6 +169,7 @@ int main(int argc, char *argv[]) {
 
                 exit(EXIT_SUCCESS);
             }
+            verify_child_terminated();
         }
     }
     // Wait for all the processes to finish

@@ -4,6 +4,9 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <stdlib.h>
+#include <sys/wait.h>
+#include <errno.h>
+
 
 #include "constants.h"
 #include "ems_operations.h"
@@ -80,4 +83,31 @@ void free_list_Pthreads(struct Pthread *Pthread_list, unsigned int max_threads) 
     for (unsigned int i = 0; i < max_threads; i++) {
         free(Pthread_list[i].thread);
     }
+}
+
+void verify_child_terminated() {
+    int status ;
+    pid_t child_terminated = waitpid(-1, &status, WNOHANG);
+
+    if (child_terminated == -1){
+        if (errno == ECHILD){
+            return;
+        }
+        else{
+            perror("waitpid");
+            exit(EXIT_FAILURE);
+        }
+    }
+    else if (child_terminated == 0){
+        return;
+    }
+    else {
+        if (WIFEXITED(status)) {
+            printf("Child %d terminated with exit status %d\n", child_terminated, WEXITSTATUS(status));
+        }
+        else if (WIFSIGNALED(status)) {
+            printf("Child %d terminated by signal %d\n", child_terminated, WTERMSIG(status));
+        }
+    }
+
 }

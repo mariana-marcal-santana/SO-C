@@ -23,6 +23,8 @@ void redirectStdinStdout(int fd_input, int fd_output, int saved_stdin, int saved
 
 void remove_Pthread_list(struct Pthread *Pthread_list, unsigned int  max_threads , pthread_t *thread);
 
+void verify_child_terminated();
+
 pthread_t *get_Pthread(struct Pthread *Pthread_list, unsigned int max_threads , int *id);
 
 unsigned int get_free_Pthread_index(struct Pthread *Pthread_list, unsigned int max_threads);
