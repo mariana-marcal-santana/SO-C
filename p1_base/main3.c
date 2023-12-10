@@ -161,6 +161,7 @@ int main(int argc, char *argv[]) {
                     return 1;
                 }
 
+                fprintf(stderr,"Processing file %s\n", entry->d_name);
                 // Redirect the standard input and output
                 redirectStdinStdout(fd_input, fd_output, saved_stdin, saved_stdout, "FD");
                 // Process the commands

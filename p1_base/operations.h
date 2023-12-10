@@ -5,6 +5,7 @@ struct ThreadArgs {
     size_t xs[MAX_RESERVATION_SIZE], ys[MAX_RESERVATION_SIZE];
     sem_t *thread_semaphore;
     struct Pthread *pthread_list;
+    unsigned int max_threads;
 };
 
 struct Pthread{
@@ -27,3 +28,5 @@ pthread_t *get_Pthread(struct Pthread *Pthread_list, unsigned int max_threads , 
 unsigned int get_free_Pthread_index(struct Pthread *Pthread_list, unsigned int max_threads);
 
 void set_List_Pthreads(struct Pthread *Pthread_list, unsigned int max_threads);
+
+void free_list_Pthreads(struct Pthread *Pthread_list, unsigned int max_threads);

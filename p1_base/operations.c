@@ -52,7 +52,8 @@ void remove_Pthread_list(struct Pthread *Pthread_list, unsigned int max_threads 
     for (unsigned  i = 0; i < max_threads; i++) {
         if (Pthread_list[i].thread == thread) {
             Pthread_list[i].id = -1;
-            free(Pthread_list[i].thread);   
+            free(Pthread_list[i].thread); 
+            Pthread_list[i].thread = malloc(sizeof(pthread_t));  
         }
     }
 }
@@ -73,4 +74,10 @@ unsigned int get_free_Pthread_index(struct Pthread *Pthread_list, unsigned int m
         }
     }
     return max_threads+1;
+}
+
+void free_list_Pthreads(struct Pthread *Pthread_list, unsigned int max_threads) {
+    for (unsigned int i = 0; i < max_threads; i++) {
+        free(Pthread_list[i].thread);
+    }
 }
