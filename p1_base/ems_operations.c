@@ -14,14 +14,12 @@
 #include "operations.h"
 #include "ems_operations.h"
 
-//int exitFlag = 0;
-
 static struct EventList* event_list = NULL;
 static unsigned int state_access_delay_ms = 0;
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
-int end_condition = 0;
+int stop_thread_flag = 1;
 
 /// Calculates a timespec from a delay in milliseconds.
 /// @param delay_ms Delay in milliseconds.
@@ -346,39 +344,72 @@ void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_thre
   int id_thread = 1;
   set_List_Pthreads(threads, num_threads);
 
-  sem_t thread_semaphore;
+  /*sem_t thread_semaphore;
   if (sem_init(&thread_semaphore, 0, num_threads) == -1) {
     perror("Error initializing semaphore");
     exit(EXIT_FAILURE);
-  }
+  }*/
 
   int *exitFlag;
 
   while (1) {
-    
-    struct ThreadArgs *args = (struct ThreadArgs *)malloc(sizeof(struct ThreadArgs));
+    //int end_condition = 0;
+    /*struct ThreadArgs *args = (struct ThreadArgs *)malloc(sizeof(struct ThreadArgs));
     args->fd_input = fd_input;
     args->fd_output = fd_output;
     args->thread_semaphore = &thread_semaphore;
     args->pthread_list = threads;
-    args->max_threads = num_threads;
+    args->max_threads = num_threads;*/
 
-    unsigned int index = get_free_Pthread_index(threads, num_threads);
+    //unsigned int index = get_free_Pthread_index(threads, num_threads);
     
-    if (sem_wait(&thread_semaphore) == -1) {
+    /*if (sem_wait(&thread_semaphore) == -1) {
       perror("Error waiting on semaphore");
       exit(EXIT_FAILURE);
+    }*/
+
+    for (unsigned int i = 0; i < num_threads; i++) {
+
+      struct ThreadArgs *args = (struct ThreadArgs *)malloc(sizeof(struct ThreadArgs));
+      args->fd_input = fd_input;
+      args->fd_output = fd_output;
+      //args->thread_semaphore = &thread_semaphore;
+      args->pthread_list = threads;
+      args->max_threads = num_threads;
+
+      threads[i].id = id_thread;
+      id_thread++;
+      if (pthread_create(threads[i].thread, NULL, &ems_process_thread, (void*)args) != 0) {
+        perror("Error creating thread");
+        exit(EXIT_FAILURE);
+      }
     }
+    
+    for (unsigned int i = 0; i < num_threads; i++) {
+      if (pthread_join(*threads[i].thread, (void**) &exitFlag) != 0) {
+        perror("Error joining thread");
+        exit(EXIT_FAILURE);
+      }
 
-    threads[index].id = id_thread;
-    id_thread++;
+      remove_Pthread_list(threads, num_threads, threads[i].thread);
 
-    if (pthread_create(threads[index].thread, NULL, &ems_process_thread, (void*)args) != 0) {
-      perror("Error creating thread");
-      exit(EXIT_FAILURE);
+      if (exitFlag != NULL) { // EOC
+        //end_condition = 1;
+        for (unsigned int j = i + 1; j < num_threads; j++) { // Wait for all threads to finish
+          //if (threads[j].id != -1)
+          pthread_cancel(*threads[j].thread);
+          //pthread_join(*threads[j].thread, (void**) &exitFlag);
+        }
+        free_list_Pthreads(threads, num_threads); 
+        free(exitFlag);
+        break;
+      }
     }
-
-    pthread_join(*threads[index].thread, (void**) &exitFlag);
+    /*if (end_condition == 1 && *exitFlag == 1) { // EOC
+      free(exitFlag);
+      break;
+    }*/
+    /*pthread_join(*threads[index].thread, (void**) &exitFlag);
     remove_Pthread_list(threads, num_threads, threads[index].thread);
 
     if (*exitFlag == 1) { // EOC
@@ -390,18 +421,17 @@ void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_thre
       free(exitFlag);
       break; 
     }
-    free(exitFlag);
+    free(exitFlag);*/
   }
 }
 
 void * ems_process_thread(void *arg) {
-
+  fprintf(stderr, "Thread %ld created\n", pthread_self());
   pthread_mutex_lock(&mutex);
   struct ThreadArgs *args = (struct ThreadArgs *)arg;
-  end_condition = 0;
 
-  int* returnVal = malloc(sizeof(int));
-  *returnVal = 0;
+  /*int* returnVal = malloc(sizeof(int));
+  *returnVal = 0;*/
 
   switch (get_next(args->fd_input)) {
 
@@ -489,13 +519,17 @@ void * ems_process_thread(void *arg) {
       case EOC:
         // Terminate the program
         ems_terminate();
+        int* returnVal = malloc(sizeof(int));
         *returnVal = 1;
-        break;
+        free(args);
+        pthread_mutex_unlock(&mutex);
+        pthread_exit((void*) returnVal);
+        //break;
     }
 
-    sem_post(args->thread_semaphore);
     free(args);
     pthread_mutex_unlock(&mutex);
-
-    return (void *) returnVal;
+    fprintf(stderr, "Thread %ld finished\n", pthread_self());
+    //return (void *) returnVal;
+    pthread_exit(NULL);
 }
