@@ -61,56 +61,32 @@ int main(int argc, char *argv[]) {
     strcat(dirPath,"/");
     strcat(dirPath,argv[1]);
     strcat(dirPath,"/");
-    
-    // Create a key
-    key_t key = ftok("/tmp", 'A');
-    if (key == -1) {
-        perror("ftok");
-        exit(EXIT_FAILURE);
-    }
-
-    // Create a shared memory segment
-    int shmid = shmget(key, SHM_SIZE, IPC_CREAT | 0666);
-    if (shmid == -1) {
-      perror("shmget");
-      exit(EXIT_FAILURE);
-    }
-
-    // Link shared memory to the process address space
-    sem_t *semaphore = (sem_t *)shmat(shmid, NULL, 0);
-    if (semaphore == (sem_t *)(-1)) {
-      perror("shmat");
-      exit(EXIT_FAILURE);
-    }   
-
-    // Create a semaphore
-    if (sem_init(semaphore, 1 , max_proc) == -1) {
-        perror("sem_init");
-        exit(EXIT_FAILURE);
-    }
+  
     // Read the directory
     struct dirent *entry;
-    while ((entry = readdir(dir))!= NULL) {
-        
-        verify_child_terminated();
-        
-        if (strcmp(entry->d_name + strlen(entry->d_name) - 5, ".jobs") == 0) {
-            
-            // Wait for a process to finish
-            if (sem_wait(semaphore) == -1) {
-                perror("Error waiting on semaphore");
-                exit(EXIT_FAILURE);
-            }
-            
-            verify_child_terminated();
+    unsigned int active_processes = 0;
 
+    while ((entry = readdir(dir))!= NULL) {
+         
+        if (strcmp(entry->d_name + strlen(entry->d_name) - 5, ".jobs") == 0) {
+
+            while(max_proc==active_processes){
+                int status;
+                pid_t terminated_pid ;
+                terminated_pid = wait(&status);
+                printf("Process %d terminated with status %d\n", terminated_pid, status);
+                active_processes--;
+            }
+                
             pid_t pid = fork();
+            active_processes++;
             if (pid == -1) {
+                active_processes--;
                 perror("Failed to fork");
                 exit(EXIT_FAILURE);
             }
             else if (pid == 0) {
-                     
+                    
                 // Child process
                 char currentPathIn[MAX_PATH_LENGTH];
                 char currentPathOut[MAX_PATH_LENGTH];
@@ -160,23 +136,31 @@ int main(int argc, char *argv[]) {
                 // Restore the standard input and output
                 redirectStdinStdout(fd_input, fd_output, saved_stdin, saved_stdout, "STD");
 
-                sem_post(semaphore);
-                shmdt(semaphore);
-
                 // Close the files
                 close(fd_input);
                 close(fd_output);
-
                 exit(EXIT_SUCCESS);
             }
-            verify_child_terminated();
+            else{
+                // Verify if one process has terminated 
+                int status;
+                pid_t terminated_pid ;
+                terminated_pid = waitpid(-1, &status, WNOHANG);
+                if (terminated_pid > 0){
+                    active_processes--;
+                    printf("Process %d terminated with status %d\n", terminated_pid, status);
+                }
+            }
         }
     }
     // Wait for all the processes to finish
-    while (wait(NULL) != -1) {
-        continue;
+    while(active_processes>0){
+        int status;
+        pid_t terminated_pid ;
+        terminated_pid = wait(&status);
+        printf("Process %d terminated with status %d\n", terminated_pid, status);
+        active_processes--;
     }
-    sem_destroy(semaphore);
     closedir(dir);
     return 0;
 }
