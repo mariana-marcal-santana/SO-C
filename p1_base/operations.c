@@ -41,7 +41,6 @@ void redirectStdinStdout(int fd_input, int fd_output, int saved_stdin, int saved
     }
 }
 
-
 void set_List_Pthreads(struct Pthread *Pthread_list, unsigned int max_threads) {
     for (unsigned int i = 0; i < max_threads; i++) {
         Pthread_list[i].id = -1;
@@ -49,65 +48,8 @@ void set_List_Pthreads(struct Pthread *Pthread_list, unsigned int max_threads) {
     }
 }
 
-
-
-void remove_Pthread_list(struct Pthread *Pthread_list, unsigned int max_threads , pthread_t *thread) {
-    for (unsigned  i = 0; i < max_threads; i++) {
-        if (Pthread_list[i].thread == thread) {
-            Pthread_list[i].id = -1;
-            free(Pthread_list[i].thread); 
-            Pthread_list[i].thread = malloc(sizeof(pthread_t));  
-        }
-    }
-}
-
-pthread_t *get_Pthread(struct Pthread *Pthread_list, unsigned int max_threads , int *id) {
-    for (unsigned int i = 0; i < max_threads; i++) {
-        if (Pthread_list[i].id == *id) {
-            return Pthread_list[i].thread;
-        }
-    }
-    return NULL;
-}
-
-unsigned int get_free_Pthread_index(struct Pthread *Pthread_list, unsigned int max_threads) {
-    for (unsigned int i = 0; i < max_threads; i++) {
-        if (Pthread_list[i].id == -1) {
-            return i;
-        }
-    }
-    return max_threads+1;
-}
-
 void free_list_Pthreads(struct Pthread *Pthread_list, unsigned int max_threads) {
     for (unsigned int i = 0; i < max_threads; i++) {
         free(Pthread_list[i].thread);
     }
-}
-
-void verify_child_terminated() {
-    int status ;
-    pid_t child_terminated = waitpid(-1, &status, WNOHANG);
-
-    if (child_terminated == -1){
-        if (errno == ECHILD){
-            return;
-        }
-        else{
-            perror("waitpid");
-            exit(EXIT_FAILURE);
-        }
-    }
-    else if (child_terminated == 0){
-        return;
-    }
-    else {
-        if (WIFEXITED(status)) {
-            printf("Child %d terminated with exit status %d\n", child_terminated, WEXITSTATUS(status));
-        }
-        else if (WIFSIGNALED(status)) {
-            printf("Child %d terminated by signal %d\n", child_terminated, WTERMSIG(status));
-        }
-    }
-
 }

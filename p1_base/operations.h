@@ -1,6 +1,6 @@
 struct ThreadArgs {
     int fd_input, fd_output;
-    unsigned int event_id, delay;
+    unsigned int event_id, delay, thread_id;
     size_t num_rows, num_columns, num_coords;
     size_t xs[MAX_RESERVATION_SIZE], ys[MAX_RESERVATION_SIZE];
     sem_t *thread_semaphore;

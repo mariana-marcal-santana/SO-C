@@ -18,7 +18,6 @@ static struct EventList* event_list = NULL;
 static unsigned int state_access_delay_ms = 0;
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 int stop_thread_flag = 1;
 
 /// Calculates a timespec from a delay in milliseconds.
@@ -340,45 +339,24 @@ void ems_process(int fd_input, int fd_output) {
 void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_threads) {
 
   struct Pthread threads[num_threads];
-  
   int id_thread = 1;
-  set_List_Pthreads(threads, num_threads);
-
-  /*sem_t thread_semaphore;
-  if (sem_init(&thread_semaphore, 0, num_threads) == -1) {
-    perror("Error initializing semaphore");
-    exit(EXIT_FAILURE);
-  }*/
-
   int *exitFlag;
 
   while (1) {
-    //int end_condition = 0;
-    /*struct ThreadArgs *args = (struct ThreadArgs *)malloc(sizeof(struct ThreadArgs));
-    args->fd_input = fd_input;
-    args->fd_output = fd_output;
-    args->thread_semaphore = &thread_semaphore;
-    args->pthread_list = threads;
-    args->max_threads = num_threads;*/
-
-    //unsigned int index = get_free_Pthread_index(threads, num_threads);
-    
-    /*if (sem_wait(&thread_semaphore) == -1) {
-      perror("Error waiting on semaphore");
-      exit(EXIT_FAILURE);
-    }*/
+    // Initialize thread list
+    set_List_Pthreads(threads, num_threads);
 
     for (unsigned int i = 0; i < num_threads; i++) {
-
-      struct ThreadArgs *args = (struct ThreadArgs *)malloc(sizeof(struct ThreadArgs));
+      // Set arguments to be used by the thread
+      struct ThreadArgs *args = (struct ThreadArgs*) malloc(sizeof(struct ThreadArgs));
       args->fd_input = fd_input;
       args->fd_output = fd_output;
-      //args->thread_semaphore = &thread_semaphore;
       args->pthread_list = threads;
       args->max_threads = num_threads;
-
+      // Assign thread id
       threads[i].id = id_thread;
       id_thread++;
+      // Create threads and assign them to the thread list
       if (pthread_create(threads[i].thread, NULL, &ems_process_thread, (void*)args) != 0) {
         perror("Error creating thread");
         exit(EXIT_FAILURE);
@@ -386,58 +364,37 @@ void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_thre
     }
     
     for (unsigned int i = 0; i < num_threads; i++) {
+      // Wait for threads to finish
       if (pthread_join(*threads[i].thread, (void**) &exitFlag) != 0) {
         perror("Error joining thread");
         exit(EXIT_FAILURE);
       }
-
-      remove_Pthread_list(threads, num_threads, threads[i].thread);
-
-      if (exitFlag != NULL) { // EOC
-        //end_condition = 1;
-        for (unsigned int j = i + 1; j < num_threads; j++) { // Wait for all threads to finish
-          //if (threads[j].id != -1)
-          pthread_cancel(*threads[j].thread);
-          //pthread_join(*threads[j].thread, (void**) &exitFlag);
-        }
-        free_list_Pthreads(threads, num_threads); 
-        free(exitFlag);
-        break;
-      }
+      // If the thread returned an exit flag (EOC), free the exitFlag if it is not the last thread
+      if (exitFlag != NULL && i != num_threads - 1) { free(exitFlag); }
     }
-    /*if (end_condition == 1 && *exitFlag == 1) { // EOC
+    // Free thread list
+    free_list_Pthreads(threads, num_threads);
+    // If the last thread returned an exit flag (EOC), free the exitFlag and terminate the program
+    if (exitFlag != NULL) {
       free(exitFlag);
-      break;
-    }*/
-    /*pthread_join(*threads[index].thread, (void**) &exitFlag);
-    remove_Pthread_list(threads, num_threads, threads[index].thread);
-
-    if (*exitFlag == 1) { // EOC
-      for (unsigned int i = 0; i < num_threads; i++) { // Wait for all threads to finish
-        if (threads[i].id != -1)
-          pthread_join(*threads[i].thread, (void**) &exitFlag);
-      }
-      free_list_Pthreads(threads, num_threads); 
-      free(exitFlag);
+      ems_terminate();
       break; 
     }
-    free(exitFlag);*/
   }
 }
 
 void * ems_process_thread(void *arg) {
   fprintf(stderr, "Thread %ld created\n", pthread_self());
-  pthread_mutex_lock(&mutex);
+
   struct ThreadArgs *args = (struct ThreadArgs *)arg;
 
-  /*int* returnVal = malloc(sizeof(int));
-  *returnVal = 0;*/
+  pthread_mutex_lock(&mutex);
 
   switch (get_next(args->fd_input)) {
 
       case CMD_CREATE:
         // Process create command
-        fprintf(stderr, "Create\n");
+        pthread_mutex_unlock(&mutex);
         if (parse_create(args->fd_input, &args->event_id, &args->num_rows, &args->num_columns) != 0) {
           fprintf(stderr, "Invalid CREATE command. See HELP for usage\n");
           //continue;
@@ -449,8 +406,8 @@ void * ems_process_thread(void *arg) {
         break;
 
       case CMD_RESERVE:
-        fprintf(stderr, "Reserve\n");
         // Process reserve command
+        pthread_mutex_unlock(&mutex);
         args->num_coords = parse_reserve(args->fd_input, MAX_RESERVATION_SIZE, &args->event_id, args->xs, args->ys);
 
         if (args->num_coords == 0) {
@@ -463,8 +420,9 @@ void * ems_process_thread(void *arg) {
         }
         break;
 
-      case CMD_SHOW:
+      case CMD_SHOW:   // LOCKS
         // Process show command
+        pthread_mutex_unlock(&mutex);
         if (parse_show(args->fd_input, &args->event_id) != 0) {
           fprintf(stderr, "Invalid SHOW command. See HELP for usage\n");
           //continue;
@@ -475,8 +433,9 @@ void * ems_process_thread(void *arg) {
         }
         break;
 
-      case CMD_LIST_EVENTS:
+      case CMD_LIST_EVENTS:   // LOCKS
         // Process list events command
+        pthread_mutex_unlock(&mutex);
         if (ems_list_events(args->fd_output)) {
           fprintf(stderr, "Failed to list events\n");
         }
@@ -484,11 +443,12 @@ void * ems_process_thread(void *arg) {
 
       case CMD_WAIT:
         // Process wait command
+        pthread_mutex_unlock(&mutex);
         if (parse_wait(args->fd_input, &args->delay, NULL) == -1) {
           fprintf(stderr, "Invalid WAIT command. See HELP for usage\n");
           //continue;
         }
-
+        //write(args->fd_output, "Thread %d\n", args->thread_id);
         if (args->delay > 0) {
           write(args->fd_output,"Waiting...\n", 11);
           ems_wait(args->delay);
@@ -496,11 +456,13 @@ void * ems_process_thread(void *arg) {
         break;
 
       case CMD_INVALID:
+        pthread_mutex_unlock(&mutex);
         fprintf(stderr, "Invalid command. See HELP for usage\n");
         break;
 
       case CMD_HELP:
         // Display help information
+        pthread_mutex_unlock(&mutex);
         fprintf(stderr,
             "Available commands:\n"
             "  CREATE <event_id> <num_rows> <num_columns>\n"
@@ -514,22 +476,19 @@ void * ems_process_thread(void *arg) {
 
       case CMD_BARRIER:  // Not implemented
       case CMD_EMPTY:
+        pthread_mutex_unlock(&mutex);
         break;
 
       case EOC:
         // Terminate the program
-        ems_terminate();
+        pthread_mutex_unlock(&mutex);
         int* returnVal = malloc(sizeof(int));
         *returnVal = 1;
         free(args);
-        pthread_mutex_unlock(&mutex);
         pthread_exit((void*) returnVal);
-        //break;
     }
 
     free(args);
-    pthread_mutex_unlock(&mutex);
     fprintf(stderr, "Thread %ld finished\n", pthread_self());
-    //return (void *) returnVal;
     pthread_exit(NULL);
 }
