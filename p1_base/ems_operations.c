@@ -342,6 +342,7 @@ void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_thre
   struct Pthread threads[num_threads];
   int id_thread = 1;
   struct ThreadArgs *returnArgs;
+  int exitFlag = -1;
 
   while (1) {
     // Initialize thread list
@@ -372,14 +373,16 @@ void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_thre
         exit(EXIT_FAILURE);
       }
       // If the thread returned an exit flag (EOC), free the exitFlag if it is not the last thread
-      if (returnArgs->return_value == 0 && i != num_threads - 1) { free(returnArgs); } //EOC
-      else if (returnArgs->return_value == 1 && i == num_threads - 1) { free(returnArgs); } //Barrier
+      if (returnArgs->return_value == 0) { 
+        free(returnArgs);
+        exitFlag = 0;
+      } //EOC
+      else if (returnArgs->return_value == 1) { free(returnArgs); } //Barrier
     }
     // Free thread list
     free_list_Pthreads(threads, num_threads);
     // If the last thread returned an exit flag (EOC), free the exitFlag and terminate the program
-    if (returnArgs->return_value == 0) {
-      free(returnArgs);
+    if (exitFlag == 0) {
       ems_terminate();
       break; 
     }
@@ -392,117 +395,119 @@ void * ems_process_thread(void *arg) {
   struct ThreadArgs *args = (struct ThreadArgs*) arg;
   enum Command cmd;
 
-  while (BARRIER_FLAG) {
-
     //pthread_mutex_lock(&mutex);
 
-    while ((cmd = get_next(args->fd_input)) != 10) {
+  while (BARRIER_FLAG && (cmd = get_next(args->fd_input)) != 10) {
 
-      pthread_mutex_lock(&mutex);
+    pthread_mutex_lock(&mutex);
 
-      switch (cmd) {
+    switch (cmd) {
 
-        case CMD_CREATE:
-          // Process create command
-          if (parse_create(args->fd_input, &args->event_id, &args->num_rows, &args->num_columns) != 0) {
-            fprintf(stderr, "Invalid CREATE command. See HELP for usage\n");
-            //continue;
-          }
-          pthread_mutex_unlock(&mutex);
-          if (ems_create(args->event_id, args->num_rows, args->num_columns)) {
-            fprintf(stderr, "Failed to create event\n");
-          }
-          break;
+      case CMD_CREATE:
+        // Process create command
+        if (parse_create(args->fd_input, &args->event_id, &args->num_rows, &args->num_columns) != 0) {
+          fprintf(stderr, "Invalid CREATE command. See HELP for usage\n");
+          //continue;
+        }
+        pthread_mutex_unlock(&mutex);
+        if (ems_create(args->event_id, args->num_rows, args->num_columns)) {
+          fprintf(stderr, "Failed to create event\n");
+        }
+        break;
 
-        case CMD_RESERVE:
-          // Process reserve command
-          args->num_coords = parse_reserve(args->fd_input, MAX_RESERVATION_SIZE, &args->event_id, args->xs, args->ys);
-          pthread_mutex_unlock(&mutex);
-          if (args->num_coords == 0) {
-            fprintf(stderr, "Invalid RESERVE command. See HELP for usage\n");
-            //continue;
-          }
-          if (ems_reserve(args->event_id, args->num_coords, args->xs, args->ys)) {
-            fprintf(stderr, "Failed to reserve seats\n");
-          }
-          break;
+      case CMD_RESERVE:
+        // Process reserve command
+        args->num_coords = parse_reserve(args->fd_input, MAX_RESERVATION_SIZE, &args->event_id, args->xs, args->ys);
+        pthread_mutex_unlock(&mutex);
+        if (args->num_coords == 0) {
+          fprintf(stderr, "Invalid RESERVE command. See HELP for usage\n");
+          //continue;
+        }
+        if (ems_reserve(args->event_id, args->num_coords, args->xs, args->ys)) {
+          fprintf(stderr, "Failed to reserve seats\n");
+        }
+        break;
 
-        case CMD_SHOW:
-          // Process show command
-          if (parse_show(args->fd_input, &args->event_id) != 0) {
-            fprintf(stderr, "Invalid SHOW command. See HELP for usage\n");
-            //continue;
-          }
-          pthread_mutex_unlock(&mutex);
-          pthread_mutex_lock(&mutex_prints);
-          if (ems_show(args->event_id, args->fd_output)) {
-            fprintf(stderr, "Failed to show event\n");
-          }
-          pthread_mutex_unlock(&mutex_prints);
-          break;
+      case CMD_SHOW:
+        // Process show command
+        if (parse_show(args->fd_input, &args->event_id) != 0) {
+          fprintf(stderr, "Invalid SHOW command. See HELP for usage\n");
+          //continue;
+        }
+        pthread_mutex_unlock(&mutex);
+        pthread_mutex_lock(&mutex_prints);
+        if (ems_show(args->event_id, args->fd_output)) {
+          fprintf(stderr, "Failed to show event\n");
+        }
+        pthread_mutex_unlock(&mutex_prints);
+        break;
 
-        case CMD_LIST_EVENTS:
-          // Process list events command
-          pthread_mutex_unlock(&mutex);
-          pthread_mutex_lock(&mutex_prints);
-          if (ems_list_events(args->fd_output)) {
-            fprintf(stderr, "Failed to list events\n");
-          }
-          pthread_mutex_unlock(&mutex_prints);
-          break;
+      case CMD_LIST_EVENTS:
+        // Process list events command
+        pthread_mutex_unlock(&mutex);
+        pthread_mutex_lock(&mutex_prints);
+        if (ems_list_events(args->fd_output)) {
+          fprintf(stderr, "Failed to list events\n");
+        }
+        pthread_mutex_unlock(&mutex_prints);
+        break;
 
-        case CMD_WAIT:
-          // Process wait command
-          if (parse_wait(args->fd_input, &args->delay, NULL) == -1) {
-            fprintf(stderr, "Invalid WAIT command. See HELP for usage\n");
-            //continue;
-          }
-          pthread_mutex_unlock(&mutex);
-          if (args->delay > 0) {
-            write(args->fd_output,"Waiting...\n", 11);
-            ems_wait(args->delay);
-          }
-          break;
+      case CMD_WAIT:
+        // Process wait command
+        if (parse_wait(args->fd_input, &args->delay, NULL) == -1) {
+          fprintf(stderr, "Invalid WAIT command. See HELP for usage\n");
+          //continue;
+        }
+        pthread_mutex_unlock(&mutex);
+        if (args->delay > 0) {
+          write(args->fd_output,"Waiting...\n", 11);
+          ems_wait(args->delay);
+        }
+        break;
 
-        case CMD_INVALID:
-          pthread_mutex_unlock(&mutex);
-          fprintf(stderr, "Invalid command. See HELP for usage\n");
-          break;
+      case CMD_INVALID:
+        pthread_mutex_unlock(&mutex);
+        fprintf(stderr, "Invalid command. See HELP for usage\n");
+        break;
 
-        case CMD_HELP:
-          // Display help information
-          pthread_mutex_unlock(&mutex);
-          fprintf(stderr,
-              "Available commands:\n"
-              "  CREATE <event_id> <num_rows> <num_columns>\n"
-              "  RESERVE <event_id> [(<x1>,<y1>) (<x2>,<y2>) ...]\n"
-              "  SHOW <event_id>\n"
-              "  LIST\n"
-              "  WAIT <delay_ms> [thread_id]\n"
-              "  BARRIER\n"
-              "  HELP\n");
-          break;
+      case CMD_HELP:
+        // Display help information
+        pthread_mutex_unlock(&mutex);
+        fprintf(stderr,
+            "Available commands:\n"
+            "  CREATE <event_id> <num_rows> <num_columns>\n"
+            "  RESERVE <event_id> [(<x1>,<y1>) (<x2>,<y2>) ...]\n"
+            "  SHOW <event_id>\n"
+            "  LIST\n"
+            "  WAIT <delay_ms> [thread_id]\n"
+            "  BARRIER\n"
+            "  HELP\n");
+        break;
 
-        case CMD_BARRIER:
-          args->return_value = 1;
-          BARRIER_FLAG = 0;
-          pthread_mutex_unlock(&mutex);
-          pthread_exit((void*) args);
+      case CMD_BARRIER:
+        args->return_value = 1;
+        BARRIER_FLAG = 0;
+        pthread_mutex_unlock(&mutex);
+        pthread_exit((void*) args);
 
-        case CMD_EMPTY:
-          pthread_mutex_unlock(&mutex);
-          break;
+      case CMD_EMPTY:
+        pthread_mutex_unlock(&mutex);
+        break;
 
-        case EOC:
-          // Terminate the program
-          pthread_mutex_unlock(&mutex);
-          args->return_value = 0;
-          pthread_exit((void*) args);
-      }
+      case EOC:
+        // Terminate the program
+        pthread_mutex_unlock(&mutex);
+        args->return_value = 0;
+        pthread_exit((void*) args);
     }
   }
-  fprintf(stderr, "Thread %ld finished\n", pthread_self());
+
+  fprintf(stderr, "Barrier reached\n");
+  args->return_value = 1;
   pthread_exit((void*) args);
+  
+  //fprintf(stderr, "Thread %ld finished\n", pthread_self());
+  //pthread_exit((void*) args);
 
   /*
   switch (get_next(args->fd_input)) {
