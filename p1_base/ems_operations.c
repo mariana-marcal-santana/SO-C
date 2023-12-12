@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
-#include <semaphore.h>
+
 
 #include "pthread.h"
 #include "eventlist.h"
@@ -509,7 +509,7 @@ void * ems_process_thread(void *arg) {
 
       case CMD_CREATE:
         // Process create command
-        pthread_mutex_unlock(&mutex);
+        pthread_mutex_unlock(&geral_mutex);
         if (parse_create(args->fd_input, &args->event_id, &args->num_rows, &args->num_columns) != 0) {
           fprintf(stderr, "Invalid CREATE command. See HELP for usage\n");
           //continue;
@@ -522,7 +522,7 @@ void * ems_process_thread(void *arg) {
 
       case CMD_RESERVE:
         // Process reserve command
-        pthread_mutex_unlock(&mutex);
+        pthread_mutex_unlock(&geral_mutex);
         args->num_coords = parse_reserve(args->fd_input, MAX_RESERVATION_SIZE, &args->event_id, args->xs, args->ys);
 
         if (args->num_coords == 0) {
@@ -535,30 +535,31 @@ void * ems_process_thread(void *arg) {
         }
         break;
 
-      case CMD_SHOW:   // LOCKS
+      case CMD_SHOW:  
         // Process show command
-        pthread_mutex_unlock(&mutex);
+        pthread_mutex_unlock(&geral_mutex);
         if (parse_show(args->fd_input, &args->event_id) != 0) {
           fprintf(stderr, "Invalid SHOW command. See HELP for usage\n");
           //continue;
         }
-
+        pthread_mutex_lock(&geral_mutex);
         if (ems_show(args->event_id, args->fd_output)) {
           fprintf(stderr, "Failed to show event\n");
         }
+        pthread_mutex_unlock(&geral_mutex);
         break;
 
-      case CMD_LIST_EVENTS:   // LOCKS
+      case CMD_LIST_EVENTS:   
         // Process list events command
-        pthread_mutex_unlock(&mutex);
         if (ems_list_events(args->fd_output)) {
           fprintf(stderr, "Failed to list events\n");
         }
+        pthread_mutex_unlock(&geral_mutex);
         break;
 
       case CMD_WAIT:
         // Process wait command
-        pthread_mutex_unlock(&mutex);
+        pthread_mutex_unlock(&geral_mutex);
         if (parse_wait(args->fd_input, &args->delay, NULL) == -1) {
           fprintf(stderr, "Invalid WAIT command. See HELP for usage\n");
           //continue;
@@ -571,13 +572,13 @@ void * ems_process_thread(void *arg) {
         break;
 
       case CMD_INVALID:
-        pthread_mutex_unlock(&mutex);
+        pthread_mutex_unlock(&geral_mutex);
         fprintf(stderr, "Invalid command. See HELP for usage\n");
         break;
 
       case CMD_HELP:
         // Display help information
-        pthread_mutex_unlock(&mutex);
+        pthread_mutex_unlock(&geral_mutex);
         fprintf(stderr,
             "Available commands:\n"
             "  CREATE <event_id> <num_rows> <num_columns>\n"
@@ -596,12 +597,12 @@ void * ems_process_thread(void *arg) {
         pthread_exit((void*) returnVal);
 
       case CMD_EMPTY:
-        pthread_mutex_unlock(&mutex);
+        pthread_mutex_unlock(&geral_mutex);
         break;
 
       case EOC:
         // Terminate the program
-        pthread_mutex_unlock(&mutex);
+        pthread_mutex_unlock(&geral_mutex);
         int* returnVal = malloc(sizeof(int));
         *returnVal = 0;
         free(args);
