@@ -20,6 +20,7 @@ static unsigned int state_access_delay_ms = 0;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutex_prints = PTHREAD_MUTEX_INITIALIZER;
 pthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;
+//pthread_rwlock_t rwlock_barrier = PTHREAD_RWLOCK_INITIALIZER;
 int BARRIER_FLAG = 1;
 
 /// Calculates a timespec from a delay in milliseconds.
@@ -399,11 +400,14 @@ void * ems_process_thread(void *arg) {
   enum Command cmd;
 
   while (1) {
-
+    
+    pthread_rwlock_rdlock(&rwlock);
     if (BARRIER_FLAG == 0) {
+      pthread_rwlock_unlock(&rwlock);
       args->return_value = 1;
       pthread_exit((void*) args);
     }
+    pthread_rwlock_unlock(&rwlock);
 
     unsigned int current_thread_index = get_index_thread(args->pthread_list, args->max_threads, (unsigned int *)&args->current_thread_id);
     if (args->pthread_list[current_thread_index].wait > 0) {
@@ -518,7 +522,9 @@ void * ems_process_thread(void *arg) {
           break;
 
         case CMD_BARRIER:
+          pthread_rwlock_wrlock(&rwlock);
           BARRIER_FLAG = 0;
+          pthread_rwlock_unlock(&rwlock);
           args->return_value = 1;
           pthread_mutex_unlock(&mutex);
           pthread_exit((void*) args);
