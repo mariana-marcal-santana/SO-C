@@ -45,85 +45,59 @@ int main(int argc, char *argv[]) {
 
   // Read the directory
   while ((entry = readdir(dir)) != NULL) {
+    char currentPathIn[MAX_PATH_LENGTH];
+    char currentPathOut[MAX_PATH_LENGTH];
 
-    char currentPath[MAX_PATH_LENGTH];
-    char currentPath2[MAX_PATH_LENGTH];
-      // Check if the file is a .jobs file
-      if (strcmp(entry->d_name + strlen(entry->d_name) - 5, ".jobs") == 0) {
-        // Set the path to the file
-        strcpy(currentPath, dirPath);
-        strcat(currentPath, entry->d_name);
-        
-        int saved_stdin = dup(STDIN_FILENO);
-        int saved_stdout = dup(STDOUT_FILENO);
+    // Set the path to the file
+    strcpy(currentPathIn, dirPath);
+    strcat(currentPathIn, entry->d_name);
 
-        // Open the file
-        int fd_input = open(currentPath, O_RDONLY);
-        if (fd_input == -1) {
-            perror("Failed to open input file");
-            fprintf(stderr, "File name: %s\n", currentPath);
-            continue;
-        }
+    int saved_stdin = dup(STDIN_FILENO);
+    int saved_stdout = dup(STDOUT_FILENO);
 
-        // Set the output file name
-        char output_filename[strlen(entry->d_name) + 1];
-        strcpy(output_filename, entry->d_name);
-        strncpy(output_filename + strlen(output_filename) - 5, ".out", 5);
-        output_filename[strlen(entry->d_name)] = '\0';
-        strcpy(currentPath2, dirPath);
-        strcat(currentPath2, output_filename);
-        
-        // Open the output file
-        int fd_output = open(currentPath2, O_WRONLY | O_CREAT | O_TRUNC, S_IWUSR | S_IRUSR);
-        if (fd_output == -1) {
-            perror("Failed to open output file");
-            fprintf(stderr, "File name: %s\n", output_filename);
-            close(fd_input);
-            continue;
-        }
+    // Open the file
+    int fd_input = open(currentPathIn, O_RDONLY);
+    if (fd_input == -1) {
+        perror("Failed to open input file");
+        fprintf(stderr, "File name: %s\n", currentPathIn);
+        continue;
+    }
 
-        // Redirect the standard input and output
-        if (dup2(fd_output, STDOUT_FILENO) == -1) {
-            perror("Failed to redirect stdout");
-            close(fd_output);
-            continue;
-        }
-        if (dup2(fd_input, STDIN_FILENO) == -1) {
-            perror("Failed to redirect stdin");
-            close(fd_input);
-            continue;
-        }
+    // Set the output file name
+    char output_filename[strlen(entry->d_name) + 1];
+    strcpy(output_filename, entry->d_name);
+    strncpy(output_filename + strlen(output_filename) - 5, ".out", 5);
+    output_filename[strlen(entry->d_name)] = '\0';
+    strcpy(currentPathOut, dirPath);
+    strcat(currentPathOut, output_filename);
 
-        // Initialize the event management system
-        if (ems_init(state_access_delay_ms)) {
-          fprintf(stderr, "Failed to initialize EMS\n");
-          return 1;
-        }
-
-        fflush(stdout);
-
-        // Process the file's commands
-        ems_process(fd_input,fd_output);
-
-        // Restore the standard input and output
-        if (dup2(saved_stdin, STDIN_FILENO) == -1) {
-            perror("Failed to restore stdin");
-            close(fd_input);
-            continue;
-        }
-        if (dup2(saved_stdout, STDOUT_FILENO) == -1) {
-            perror("Failed to restore stdout");
-            close(fd_output);
-            continue;
-        }
-
-        fflush(stdout);
-
-        // Close the files
+    // Open the output file
+    int fd_output = open(currentPathOut, O_WRONLY | O_CREAT | O_TRUNC, S_IWUSR | S_IRUSR);
+    if (fd_output == -1) {
+        perror("Failed to open output file");
+        fprintf(stderr, "File name: %s\n", output_filename);
         close(fd_input);
-        close(fd_output);
+        continue;
+    }
 
-      }
+    // Initialize the event management system
+    if (ems_init(state_access_delay_ms)) {
+        fprintf(stderr, "Failed to initialize EMS\n");
+        return 1;
+    }
+
+    // Redirect the standard input and output
+    redirectStdinStdout(fd_input, fd_output, saved_stdin, saved_stdout, "FD");
+    // Process the commands
+    ems_process(fd_input, fd_output);
+    // Restore the standard input and output
+    redirectStdinStdout(fd_input, fd_output, saved_stdin, saved_stdout, "STD");
+
+    // Close the files
+    close(fd_input);
+    close(fd_output);
+
+      
   }
   closedir(dir);
   return 0;
