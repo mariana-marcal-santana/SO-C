@@ -342,7 +342,7 @@ void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_thre
   struct Pthread threads[num_threads];
   int id_thread = 1;
   struct ThreadArgs *returnArgs;
-  int exitFlag = -1;
+  int exitFlag = 1;
 
   while (1) {
     // Initialize thread list
@@ -356,14 +356,16 @@ void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_thre
       args->fd_output = fd_output;
       args->pthread_list = threads;
       args->max_threads = num_threads;
-      // Assign thread id
+      args->current_thread_id = id_thread;
+      // Assign thread id and wait time
       threads[i].id = id_thread;
-      id_thread++;
+      threads[i].wait = 0;
       // Create threads and assign them to the thread list
       if (pthread_create(threads[i].thread, NULL, &ems_process_thread, (void*)args) != 0) {
         perror("Error creating thread");
         exit(EXIT_FAILURE);
       }
+      id_thread++;
     }
     
     for (unsigned int i = 0; i < num_threads; i++) {
@@ -401,6 +403,14 @@ void * ems_process_thread(void *arg) {
     if (BARRIER_FLAG == 0) {
       args->return_value = 1;
       pthread_exit((void*) args);
+    }
+
+    unsigned int current_thread_index = get_index_thread(args->pthread_list, args->max_threads, (unsigned int *)&args->current_thread_id);
+    if (args->pthread_list[current_thread_index].wait > 0) {
+      fprintf(stderr,"Thread %ld waiting\n", pthread_self());
+      write(args->fd_output,"Waiting...\n", 11);
+      ems_wait(args->pthread_list[current_thread_index].wait);
+      args->pthread_list[current_thread_index].wait = 0;
     }
 
     pthread_mutex_lock(&mutex);
@@ -462,14 +472,26 @@ void * ems_process_thread(void *arg) {
 
         case CMD_WAIT:
           // Process wait command
-          if (parse_wait(args->fd_input, &args->delay, NULL) == -1) {
+          unsigned int id_thread = 0;
+
+          if (parse_wait(args->fd_input, &args->delay, &id_thread) == -1) {
             fprintf(stderr, "Invalid WAIT command. See HELP for usage\n");
             //continue;
           }
-          pthread_mutex_unlock(&mutex);
-          if (args->delay > 0) {
+          ptread_mutex_unlock(&mutex);
+          if (args->delay > 0 && id_thread == 0 ) {
+            pthread_mutex_lock(&mutex);
             write(args->fd_output,"Waiting...\n", 11);
             ems_wait(args->delay);
+            pthread_mutex_unlock(&mutex);
+          }
+          else if (args->delay > 0 && id_thread > 0) {
+            unsigned int index = get_index_thread(args->pthread_list, args->max_threads, &id_thread);
+            if (index == 0 ) {
+              fprintf(stderr, "Invalid thread id\n");
+              break;
+            }
+            args->pthread_list[index].wait = args->delay;
           }
           break;
 

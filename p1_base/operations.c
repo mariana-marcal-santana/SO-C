@@ -53,3 +53,13 @@ void free_list_Pthreads(struct Pthread *Pthread_list, unsigned int max_threads) 
         free(Pthread_list[i].thread);
     }
 }
+
+unsigned int get_index_thread(struct Pthread *Pthread_list, unsigned int max_threads, unsigned int *index) {
+    int index_thread = (int)*index;
+    for (unsigned int i = 0; i < max_threads; i++) {
+        if (Pthread_list[i].id == index_thread ) {
+            return i;
+        }
+    }
+    return 0;
+}

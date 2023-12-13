@@ -5,11 +5,13 @@ struct ThreadArgs {
     size_t xs[MAX_RESERVATION_SIZE], ys[MAX_RESERVATION_SIZE];
     struct Pthread *pthread_list;
     unsigned int max_threads;
+    int current_thread_id;
 };
 
 struct Pthread{
     int id ;
     pthread_t *thread;   
+    unsigned int wait ;
 };
 
 /// Redirects the standard input and output to the given file descriptors or vice versa.
@@ -20,14 +22,8 @@ struct Pthread{
 /// @param flag Determines whether to redirect the standard input and output to the given file descriptors or vice versa.
 void redirectStdinStdout(int fd_input, int fd_output, int saved_stdin, int saved_stdout, char *flag);
 
-void remove_Pthread_list(struct Pthread *Pthread_list, unsigned int  max_threads , pthread_t *thread);
-
-void verify_child_terminated();
-
-pthread_t *get_Pthread(struct Pthread *Pthread_list, unsigned int max_threads , int *id);
-
-unsigned int get_free_Pthread_index(struct Pthread *Pthread_list, unsigned int max_threads);
-
 void set_List_Pthreads(struct Pthread *Pthread_list, unsigned int max_threads);
 
 void free_list_Pthreads(struct Pthread *Pthread_list, unsigned int max_threads);
+
+unsigned int get_index_thread(struct Pthread *Pthread_list, unsigned int max_threads, unsigned int *index);
