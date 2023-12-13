@@ -1,7 +1,6 @@
 # this should fail (event not created)
 RESERVE 1 [(1,1) (10,10)]
 
-WAIT 5000 3
 CREATE 1 10 10
 RESERVE 1 [(2,2)]
 SHOW 1

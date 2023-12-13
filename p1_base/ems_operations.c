@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
-
+#include <pthread.h>
 
 #include "pthread.h"
 #include "eventlist.h"
@@ -19,6 +19,7 @@ static unsigned int state_access_delay_ms = 0;
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutex_prints = PTHREAD_MUTEX_INITIALIZER;
+pthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;
 int BARRIER_FLAG = 1;
 
 /// Calculates a timespec from a delay in milliseconds.
@@ -397,7 +398,6 @@ void * ems_process_thread(void *arg) {
   struct ThreadArgs *args = (struct ThreadArgs*) arg;
   enum Command cmd;
 
-  
   while (1) {
 
     if (BARRIER_FLAG == 0) {
@@ -417,7 +417,7 @@ void * ems_process_thread(void *arg) {
 
     while ((cmd = get_next(args->fd_input)) != 10) {
 
-      //pthread_mutex_lock(&mutex);
+      //pthread_mutex_unlock(&mutex);    //?????????????
 
       switch (cmd) {
 
@@ -453,21 +453,24 @@ void * ems_process_thread(void *arg) {
             //continue;
           }
           pthread_mutex_unlock(&mutex);
-          pthread_mutex_lock(&mutex_prints);
+          //pthread_mutex_lock(&mutex_prints);
+          pthread_rwlock_wrlock(&rwlock);
           if (ems_show(args->event_id, args->fd_output)) {
             fprintf(stderr, "Failed to show event\n");
           }
-          pthread_mutex_unlock(&mutex_prints);
+          pthread_rwlock_unlock(&rwlock);
           break;
 
         case CMD_LIST_EVENTS:
           // Process list events command
           pthread_mutex_unlock(&mutex);
-          pthread_mutex_lock(&mutex_prints);
+          //pthread_mutex_lock(&mutex_prints);
+          pthread_rwlock_wrlock(&rwlock);
+
           if (ems_list_events(args->fd_output)) {
             fprintf(stderr, "Failed to list events\n");
           }
-          pthread_mutex_unlock(&mutex_prints);
+          pthread_rwlock_unlock(&rwlock);
           break;
 
         case CMD_WAIT:
@@ -478,7 +481,7 @@ void * ems_process_thread(void *arg) {
             fprintf(stderr, "Invalid WAIT command. See HELP for usage\n");
             //continue;
           }
-          ptread_mutex_unlock(&mutex);
+          pthread_mutex_unlock(&mutex);
           if (args->delay > 0 && id_thread == 0 ) {
             pthread_mutex_lock(&mutex);
             write(args->fd_output,"Waiting...\n", 11);
@@ -515,8 +518,8 @@ void * ems_process_thread(void *arg) {
           break;
 
         case CMD_BARRIER:
-          args->return_value = 1;
           BARRIER_FLAG = 0;
+          args->return_value = 1;
           pthread_mutex_unlock(&mutex);
           pthread_exit((void*) args);
 
