@@ -394,8 +394,7 @@ void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_thre
 }
 
 void * ems_process_thread(void *arg) {
-  fprintf(stderr, "Thread %ld created\n", pthread_self());
-
+  
   struct ThreadArgs *args = (struct ThreadArgs*) arg;
   enum Command cmd;
 
@@ -411,8 +410,6 @@ void * ems_process_thread(void *arg) {
 
     unsigned int current_thread_index = get_index_thread(args->pthread_list, args->max_threads, (unsigned int *)&args->current_thread_id);
     if (args->pthread_list[current_thread_index].wait > 0) {
-      fprintf(stderr,"Thread %ld waiting\n", pthread_self());
-      write(args->fd_output,"Waiting...\n", 11);
       ems_wait(args->pthread_list[current_thread_index].wait);
       args->pthread_list[current_thread_index].wait = 0;
     }
@@ -420,8 +417,6 @@ void * ems_process_thread(void *arg) {
     pthread_mutex_lock(&mutex);
 
     while ((cmd = get_next(args->fd_input)) != 10) {
-
-      //pthread_mutex_unlock(&mutex);    //?????????????
 
       switch (cmd) {
 
