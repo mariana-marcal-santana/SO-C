@@ -8,6 +8,12 @@
 
 #include "constants.h"
 
+
+struct  Coordinates{
+    size_t x;
+    size_t y;
+};
+
 static int read_uint(int fd, unsigned int *value, char *next) {
   char buf[16];
 
@@ -136,98 +142,6 @@ enum Command get_next(int fd) {
   }
 }
 
-enum Command get_next_threads(int fd, pthread_mutex_t mutex) {
-  pthread_mutex_lock(&mutex);
-  char buf[16];
-  if (read(fd, buf, 1) != 1) {
-    return EOC;
-  }
-
-  switch (buf[0]) {
-    case 'C':
-      if (read(fd, buf + 1, 6) != 6 || strncmp(buf, "CREATE ", 7) != 0) {
-        cleanup(fd);
-        return CMD_INVALID;
-      }
-
-      return CMD_CREATE;
-
-    case 'R':
-      if (read(fd, buf + 1, 7) != 7 || strncmp(buf, "RESERVE ", 8) != 0) {
-        cleanup(fd);
-        return CMD_INVALID;
-      }
-
-      return CMD_RESERVE;
-
-    case 'S':
-      if (read(fd, buf + 1, 4) != 4 || strncmp(buf, "SHOW ", 5) != 0) {
-        cleanup(fd);
-        return CMD_INVALID;
-      }
-
-      return CMD_SHOW;
-
-    case 'L':
-      if (read(fd, buf + 1, 3) != 3 || strncmp(buf, "LIST", 4) != 0) {
-        cleanup(fd);
-        return CMD_INVALID;
-      }
-
-      if (read(fd, buf + 4, 1) != 0 && buf[4] != '\n') {
-        cleanup(fd);
-        return CMD_INVALID;
-      }
-
-      return CMD_LIST_EVENTS;
-
-    case 'B':
-      if (read(fd, buf + 1, 6) != 6 || strncmp(buf, "BARRIER", 7) != 0) {
-        cleanup(fd);
-        return CMD_INVALID;
-      }
-
-      if (read(fd, buf + 7, 1) != 0 && buf[7] != '\n') {
-        cleanup(fd);
-        return CMD_INVALID;
-      }
-
-      return CMD_BARRIER;
-
-    case 'W':
-      if (read(fd, buf + 1, 4) != 4 || strncmp(buf, "WAIT ", 5) != 0) {
-        cleanup(fd);
-        return CMD_INVALID;
-      }
-
-      return CMD_WAIT;
-
-    case 'H':
-      if (read(fd, buf + 1, 3) != 3 || strncmp(buf, "HELP", 4) != 0) {
-        cleanup(fd);
-        return CMD_INVALID;
-      }
-
-      if (read(fd, buf + 4, 1) != 0 && buf[4] != '\n') {
-        cleanup(fd);
-        return CMD_INVALID;
-      }
-
-      return CMD_HELP;
-
-    case '#':
-      cleanup(fd);
-      return CMD_EMPTY;
-
-    case '\n':
-      return CMD_EMPTY;
-
-    default:
-      cleanup(fd);
-      return CMD_INVALID;
-  }
-}
-
 int parse_create(int fd, unsigned int *event_id, size_t *num_rows, size_t *num_cols) {
   char ch;
 
@@ -253,8 +167,33 @@ int parse_create(int fd, unsigned int *event_id, size_t *num_rows, size_t *num_c
   return 0;
 }
 
+// Compare function for qsort based on x-values
+int compare_coords(const void *a, const void *b) {
+    if (((struct Coordinates*)a)->x < ((struct Coordinates*)b)->x) {
+        return -1;
+    } else if (((struct Coordinates*)a)->x > ((struct Coordinates*)b)->x) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+// Compare function for qsort based on y-values
+int compare_coords_y(const void *a, const void *b) {
+    if (((struct Coordinates*)a)->y < ((struct Coordinates*)b)->y) {
+        return -1;
+    } else if (((struct Coordinates*)a)->y > ((struct Coordinates*)b)->y) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
 size_t parse_reserve(int fd, size_t max, unsigned int *event_id, size_t *xs, size_t *ys) {
+  
   char ch;
+  struct Coordinates *coords = malloc(sizeof(struct Coordinates) * max);
+  
 
   if (read_uint(fd, event_id, &ch) != 0 || ch != ' ') {
     cleanup(fd);
@@ -279,6 +218,7 @@ size_t parse_reserve(int fd, size_t max, unsigned int *event_id, size_t *xs, siz
       return 0;
     }
     xs[num_coords] = (size_t)x;
+    coords[num_coords].x = (size_t)x;
 
     unsigned int y;
     if (read_uint(fd, &y, &ch) != 0 || ch != ')') {
@@ -286,6 +226,7 @@ size_t parse_reserve(int fd, size_t max, unsigned int *event_id, size_t *xs, siz
       return 0;
     }
     ys[num_coords] = (size_t)y;
+    coords[num_coords].y = (size_t)y;
 
     num_coords++;
 
@@ -308,6 +249,18 @@ size_t parse_reserve(int fd, size_t max, unsigned int *event_id, size_t *xs, siz
     cleanup(fd);
     return 0;
   }
+
+  // Sort the coordinates by x-value
+  qsort(coords, num_coords, sizeof(struct Coordinates), compare_coords);
+  // Sort the coordinates by y-value
+  qsort(coords, num_coords, sizeof(struct Coordinates), compare_coords_y);
+
+  for (size_t i = 0; i < num_coords; i++) {
+    xs[i] = coords[i].x;
+    ys[i] = coords[i].y;
+  }
+
+  free(coords);
 
   return num_coords;
 }

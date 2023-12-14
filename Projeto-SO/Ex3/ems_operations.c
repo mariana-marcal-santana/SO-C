@@ -49,7 +49,7 @@ static unsigned int* get_seat_with_delay(struct Event* event, size_t index) {
   struct timespec delay = delay_to_timespec(state_access_delay_ms);
   nanosleep(&delay, NULL);  // Should not be removed
 
-  return &event->data[index];
+  return &event->Data[index].place;
 }
 
 /// Gets the index of a seat.
@@ -121,9 +121,9 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
   event->rows = num_rows;
   event->cols = num_cols;
   event->reservations = 0;
-  event->data = malloc(num_rows * num_cols * sizeof(unsigned int));
+  event->Data = malloc(sizeof(struct Data) * num_rows * num_cols);
 
-  if (event->data == NULL) {
+  if (event->Data == NULL) {
     fprintf(stderr, "Error allocating memory for event data\n");
     free(event);
     pthread_rwlock_unlock(&rwlock);
@@ -131,12 +131,13 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
   }
 
   for (size_t i = 0; i < num_rows * num_cols; i++) {
-    event->data[i] = 0;
+    event->Data[i].place = 0;
+    pthread_mutex_init(&event->Data[i].mutex, NULL);
   }
 
   if (append_to_list(event_list, event) != 0) {
     fprintf(stderr, "Error appending event to list\n");
-    free(event->data);
+    free(event->Data);
     free(event);
     pthread_rwlock_unlock(&rwlock);
     return 1;
@@ -158,7 +159,7 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
     pthread_rwlock_unlock(&rwlock);
-    return 1;
+    return 1; 
   }
 
   struct Event* event = get_event_with_delay(event_id);
@@ -181,12 +182,14 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
       break;
     }
 
+    pthread_mutex_lock(&event->Data[seat_index(event, row, col)].mutex);
     if (*get_seat_with_delay(event, seat_index(event, row, col)) != 0) {
       fprintf(stderr, "Seat already reserved\n");
+      pthread_mutex_unlock(&event->Data[seat_index(event, row, col)].mutex);
       break;
     }
-
     *get_seat_with_delay(event, seat_index(event, row, col)) = reservation_id;
+    pthread_mutex_unlock(&event->Data[seat_index(event, row, col)].mutex);
   }
 
   // If the reservation was not successful, free the seats that were reserved.

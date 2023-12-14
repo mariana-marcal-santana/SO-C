@@ -32,8 +32,7 @@ int append_to_list(struct EventList* list, struct Event* event) {
 
 static void free_event(struct Event* event) {
   if (!event) return;
-
-  free(event->data);
+  free(event->Data);
   free(event);
 }
 
