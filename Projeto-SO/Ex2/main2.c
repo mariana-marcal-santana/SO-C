@@ -8,6 +8,7 @@
 #include <sys/wait.h>
 #include <semaphore.h>
 #include <sys/shm.h>
+#include <errno.h>
 
 #include "constants.h"
 #include "ems_operations.h"
@@ -18,13 +19,12 @@
 int main(int argc, char *argv[]) {
 
     unsigned int state_access_delay_ms = STATE_ACCESS_DELAY_MS;
-    unsigned int max_proc = MAX_PROC;
-    unsigned int max_threads = MAX_THREADS;
+    unsigned int max_proc = MAX_PROC ;
     
     // Check if a delay is provided
-    if (argc > 4) {
+    if (argc > 3) {
         char *endptr;
-        unsigned long int delay = strtoul(argv[4], &endptr, 10);
+        unsigned long int delay = strtoul(argv[3], &endptr, 10);
 
         if (*endptr != '\0' || delay > UINT_MAX) {
             fprintf(stderr, "Invalid delay value or value too large\n");
@@ -33,18 +33,6 @@ int main(int argc, char *argv[]) {
         state_access_delay_ms = (unsigned int)delay;
     }
   
-    // Set the maximum number of threads
-    if (argc > 3) {
-        char *endptr;
-        unsigned long int th = strtoul(argv[3], &endptr, 10);
-
-        if (*endptr != '\0' || th > UINT_MAX) {
-            fprintf(stderr, "Invalid delay value or value too large\n");
-            return 1;
-        }
-        max_threads = (unsigned int)th;
-    }
-
     // Set the maximum number of processes
     if (argc > 2) {
         char *endptr;
@@ -73,8 +61,8 @@ int main(int argc, char *argv[]) {
     strcat(dirPath,"/");
     strcat(dirPath,argv[1]);
     strcat(dirPath,"/");
-    
- // Read the directory
+  
+    // Read the directory
     struct dirent *entry;
     unsigned int active_processes = 0;
 
@@ -144,7 +132,7 @@ int main(int argc, char *argv[]) {
                 // Redirect the standard input and output
                 redirectStdinStdout(fd_input, fd_output, saved_stdin, saved_stdout, "FD");
                 // Process the commands
-                ems_process_with_threads(fd_input, fd_output, max_threads);
+                ems_process(fd_input, fd_output);
                 // Restore the standard input and output
                 redirectStdinStdout(fd_input, fd_output, saved_stdin, saved_stdout, "STD");
 

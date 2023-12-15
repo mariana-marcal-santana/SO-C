@@ -312,12 +312,12 @@ void ems_process(int fd_input, int fd_output) {
             "  RESERVE <event_id> [(<x1>,<y1>) (<x2>,<y2>) ...]\n"
             "  SHOW <event_id>\n"
             "  LIST\n"
-            "  WAIT <delay_ms> [thread_id]\n"  // thread_id is not implemented
-            "  BARRIER\n"                      // Not implemented
+            "  WAIT <delay_ms> [thread_id]\n"
+            "  BARRIER\n"
             "  HELP\n");
         break;
 
-      case CMD_BARRIER:  // Not implemented
+      case CMD_BARRIER:
       case CMD_EMPTY:
         break;
 
