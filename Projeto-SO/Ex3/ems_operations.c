@@ -76,7 +76,6 @@ int ems_terminate() {
 
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
-    pthread_rwlock_unlock(&rwlock);
     return 1;
   }
 
@@ -87,17 +86,17 @@ int ems_terminate() {
 
 int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
 
-  pthread_rwlock_wrlock(&rwlock);
+  try_lock_rwmutex(&rwlock);
 
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
-    pthread_rwlock_unlock(&rwlock);
+    try_unlock_rwmutex(&rwlock);
     return 1;
   }
 
   if (get_event_with_delay(event_id) != NULL) {
     fprintf(stderr, "Event already exists\n");
-    pthread_rwlock_unlock(&rwlock);
+    try_unlock_rwmutex(&rwlock);
     return 1;
   }
 
@@ -105,7 +104,7 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
 
   if (event == NULL) {
     fprintf(stderr, "Error allocating memory for event\n");
-    pthread_rwlock_unlock(&rwlock);
+    try_unlock_rwmutex(&rwlock);
     return 1;
   }
 
@@ -118,33 +117,39 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
   if (event->Data == NULL) {
     fprintf(stderr, "Error allocating memory for event data\n");
     free(event);
-    pthread_rwlock_unlock(&rwlock);
+    try_unlock_rwmutex(&rwlock);
     return 1;
   }
 
   for (size_t i = 0; i < num_rows * num_cols; i++) {
     event->Data[i].place = 0;
-    pthread_mutex_init(&event->Data[i].mutex, NULL);
+    if ( pthread_mutex_init(&event->Data[i].mutex, NULL) != 0) {
+      fprintf(stderr, "Error initializing mutex\n");
+      free(event->Data);
+      free(event);
+      try_unlock_rwmutex(&rwlock);
+      return 1;
+    }
   }
 
   if (append_to_list(event_list, event) != 0) {
     fprintf(stderr, "Error appending event to list\n");
     free(event->Data);
     free(event);
-    pthread_rwlock_unlock(&rwlock);
+    try_unlock_rwmutex(&rwlock);
     return 1;
   }
-  pthread_rwlock_unlock(&rwlock);
+  try_unlock_rwmutex(&rwlock);
   return 0;
 }
 
 int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys) {
   
-  pthread_rwlock_wrlock(&rwlock);
+  try_lock_rwmutex(&rwlock);
   
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
-    pthread_rwlock_unlock(&rwlock);
+    try_unlock_rwmutex(&rwlock);
     return 1; 
   }
 
@@ -152,7 +157,7 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
 
   if (event == NULL) {
     fprintf(stderr, "Event not found\n");
-    pthread_rwlock_unlock(&rwlock);
+    try_unlock_rwmutex(&rwlock);
     return 1;
   }
 
@@ -168,14 +173,14 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
       break;
     }
 
-    pthread_mutex_lock(&event->Data[seat_index(event, row, col)].mutex);
+    try_lock_mutex(&event->Data[seat_index(event, row, col)].mutex);
     if (*get_seat_with_delay(event, seat_index(event, row, col)) != 0) {
       fprintf(stderr, "Seat already reserved\n");
-      pthread_mutex_unlock(&event->Data[seat_index(event, row, col)].mutex);
+      try_unlock_mutex(&event->Data[seat_index(event, row, col)].mutex);
       break;
     }
     *get_seat_with_delay(event, seat_index(event, row, col)) = reservation_id;
-    pthread_mutex_unlock(&event->Data[seat_index(event, row, col)].mutex);
+    try_unlock_mutex(&event->Data[seat_index(event, row, col)].mutex);
   }
 
   // If the reservation was not successful, free the seats that were reserved.
@@ -184,16 +189,16 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
     for (size_t j = 0; j < i; j++) {
       *get_seat_with_delay(event, seat_index(event, xs[j], ys[j])) = 0;
     }
-    pthread_rwlock_unlock(&rwlock);
+    try_unlock_rwmutex(&rwlock);
     return 1;
   }
-  pthread_rwlock_unlock(&rwlock);
+  try_unlock_rwmutex(&rwlock);
   return 0;
 }
 
 int ems_show(unsigned int event_id, int fd_output) {
   
-  pthread_rwlock_wrlock(&rwlock);
+  try_lock_rwmutex(&rwlock);
   
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
@@ -205,7 +210,7 @@ int ems_show(unsigned int event_id, int fd_output) {
 
   if (event == NULL) {
     fprintf(stderr, "Event not found\n");
-    pthread_rwlock_unlock(&rwlock);
+    try_unlock_rwmutex(&rwlock);
     return 1;
   }
 
@@ -226,23 +231,23 @@ int ems_show(unsigned int event_id, int fd_output) {
     write(fd_output, "\n", 1);
     fflush(stdout);
   }
-  pthread_rwlock_unlock(&rwlock);
+  try_unlock_rwmutex(&rwlock);
   return 0;
 }
 
 int ems_list_events(int fd_output) {
   
-  pthread_rwlock_wrlock(&rwlock);
+  try_lock_rwmutex(&rwlock);
   
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
-    pthread_rwlock_unlock(&rwlock);
+    try_unlock_rwmutex(&rwlock);
     return 1;
   }
 
   if (event_list->head == NULL) {
     fprintf(stderr,"No events\n");
-    pthread_rwlock_unlock(&rwlock);
+    try_unlock_rwmutex(&rwlock);
     return 0;
   }
 
@@ -259,7 +264,7 @@ int ems_list_events(int fd_output) {
     current = current->next;
   }
 
-  pthread_rwlock_unlock(&rwlock);
+  try_unlock_rwmutex(&rwlock);
   return 0;
 }
 
@@ -328,13 +333,13 @@ void * ems_process_thread(void *arg) {
 
   while (1) {
 
-    pthread_rwlock_rdlock(&rwlock);
+    try_lock_readmutex(&rwlock);
     if (BARRIER_FLAG == 0) {
-      pthread_rwlock_unlock(&rwlock);    //Verify if the barrier flag is set
+      try_unlock_rwmutex(&rwlock);  //Verify if the barrier flag is set
       args->return_value = 1;            //Stop thread
       pthread_exit((void*) args);
     }
-    pthread_rwlock_unlock(&rwlock);
+    try_unlock_rwmutex(&rwlock);
 
     // Verify if the thread has to wait before processing the next command
     unsigned int current_thread_index = get_index_thread(args->pthread_list, args->max_threads, (unsigned int *)&args->current_thread_id);
@@ -343,7 +348,7 @@ void * ems_process_thread(void *arg) {
       args->pthread_list[current_thread_index].wait = 0;   //Reset wait time
     }
 
-    pthread_mutex_lock(&mutex);
+    try_lock_mutex(&mutex);
 
     // Read next command
     while ((cmd = get_next(args->fd_input)) != 10) {
@@ -356,7 +361,7 @@ void * ems_process_thread(void *arg) {
             fprintf(stderr, "Invalid CREATE command. See HELP for usage\n");
             //continue;
           }
-          pthread_mutex_unlock(&mutex);
+          try_unlock_mutex(&mutex);
           if (ems_create(args->event_id, args->num_rows, args->num_columns)) {
             fprintf(stderr, "Failed to create event\n");
           }
@@ -365,7 +370,7 @@ void * ems_process_thread(void *arg) {
         case CMD_RESERVE:
           // Process reserve command
           args->num_coords = parse_reserve(args->fd_input, MAX_RESERVATION_SIZE, &args->event_id, args->xs, args->ys);
-          pthread_mutex_unlock(&mutex);
+          try_unlock_mutex(&mutex);
           if (args->num_coords == 0) {
             fprintf(stderr, "Invalid RESERVE command. See HELP for usage\n");
             //continue;
@@ -381,7 +386,7 @@ void * ems_process_thread(void *arg) {
             fprintf(stderr, "Invalid SHOW command. See HELP for usage\n");
             //continue;
           }
-          pthread_mutex_unlock(&mutex);
+          try_unlock_mutex(&mutex);
           if (ems_show(args->event_id, args->fd_output)) {
             fprintf(stderr, "Failed to show event\n");
           }
@@ -389,7 +394,7 @@ void * ems_process_thread(void *arg) {
 
         case CMD_LIST_EVENTS:
           // Process list events command
-          pthread_mutex_unlock(&mutex);
+          try_unlock_mutex(&mutex);
           if (ems_list_events(args->fd_output)) {
             fprintf(stderr, "Failed to list events\n");
           }
@@ -402,13 +407,13 @@ void * ems_process_thread(void *arg) {
             fprintf(stderr, "Invalid WAIT command. See HELP for usage\n");
             //continue;
           }
-          pthread_mutex_unlock(&mutex);
+          try_unlock_mutex(&mutex);
           // If the thread id is 0, block all threads and wait to restart
           if (args->delay > 0 && id_thread == 0 ) {
-            pthread_mutex_lock(&mutex);
+            try_lock_mutex(&mutex);
             write(args->fd_output,"Waiting...\n", 11);
             ems_wait(args->delay);
-            pthread_mutex_unlock(&mutex);
+            try_unlock_mutex(&mutex);
           }
           // If the thread id is not 0, set the wait time for the thread with the given id
           else if (args->delay > 0 && id_thread > 0) {
@@ -423,13 +428,13 @@ void * ems_process_thread(void *arg) {
 
         case CMD_INVALID:
           // Invalid command
-          pthread_mutex_unlock(&mutex);
+          try_unlock_mutex(&mutex);
           fprintf(stderr, "Invalid command. See HELP for usage\n");
           break;
 
         case CMD_HELP:
           // Display help information
-          pthread_mutex_unlock(&mutex);
+          try_unlock_mutex(&mutex); 
           fprintf(stderr,
               "Available commands:\n"
               "  CREATE <event_id> <num_rows> <num_columns>\n"
@@ -443,19 +448,19 @@ void * ems_process_thread(void *arg) {
 
         case CMD_BARRIER:
           // Wait all threads before the barrier to finish and reset all threads after the barrier
-          pthread_rwlock_wrlock(&rwlock);
+          try_lock_rwmutex(&rwlock);
           BARRIER_FLAG = 0;
-          pthread_rwlock_unlock(&rwlock);
+          try_unlock_rwmutex(&rwlock);
           args->return_value = 1;
-          pthread_mutex_unlock(&mutex);
+          try_unlock_mutex(&mutex); 
           pthread_exit((void*) args);
 
         case CMD_EMPTY:
-          pthread_mutex_unlock(&mutex);
+          try_unlock_mutex(&mutex);
           break;
 
         case EOC:
-          pthread_mutex_unlock(&mutex);
+          try_unlock_mutex(&mutex);
           args->return_value = 0;
           pthread_exit((void*) args);
       }

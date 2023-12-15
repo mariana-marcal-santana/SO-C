@@ -57,3 +57,38 @@ unsigned int get_index_thread(struct Pthread *Pthread_list, unsigned int max_thr
     }
     return 0;
 }
+
+void try_unlock_mutex(pthread_mutex_t *mutex) {
+    if (pthread_mutex_unlock(mutex) != 0) {
+        perror("Failed to unlock mutex");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void try_lock_mutex(pthread_mutex_t *mutex) {
+    if (pthread_mutex_lock(mutex) != 0) {
+        perror("Failed to lock mutex");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void try_lock_rwmutex(pthread_rwlock_t *rwmutex) {
+    if (pthread_rwlock_wrlock(rwmutex) != 0) {
+        perror("Failed to lock rwmutex");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void try_unlock_rwmutex(pthread_rwlock_t *rwmutex) {
+    if (pthread_rwlock_unlock(rwmutex) != 0) {
+        perror("Failed to unlock rwmutex");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void try_lock_readmutex(pthread_rwlock_t *rwmutex) {
+    if (pthread_rwlock_rdlock(rwmutex) != 0) {
+        perror("Failed to lock rwmutex");
+        exit(EXIT_FAILURE);
+    }
+}

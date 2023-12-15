@@ -38,3 +38,24 @@ void free_list_Pthreads(struct Pthread *Pthread_list, unsigned int max_threads);
 /// @param id Thread id.
 /// @return Index of the thread with the given id.
 unsigned int get_index_thread(struct Pthread *Pthread_list, unsigned int max_threads, unsigned int *id);
+
+/// Try to unlock the given mutex.
+/// @param mutex Mutex to unlock.
+void try_unlock_mutex(pthread_mutex_t *mutex);
+
+/// Try to unlock the given mutex.
+/// @param mutex Mutex to unlock.
+void try_lock_mutex(pthread_mutex_t *mutex);
+
+///Try to unlock the given read write mutex.
+/// @param mutex Read write mutex to unlock.
+void try_unlock_rwmutex(pthread_rwlock_t *mutex);
+
+/// Try to lock the given mutex.
+/// @param mutex Mutex to lock.
+void try_lock_rwmutex(pthread_rwlock_t *mutex); 
+
+/// Try to lock the given mutex.
+/// @param mutex Mutex to lock.
+void try_lock_readmutex(pthread_rwlock_t *mutex);
+
