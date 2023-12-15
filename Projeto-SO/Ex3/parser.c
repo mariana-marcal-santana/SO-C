@@ -1,13 +1,11 @@
-#include "parser.h"
-
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
 
+#include "parser.h"
 #include "constants.h"
-
 
 struct  Coordinates{
     size_t x;

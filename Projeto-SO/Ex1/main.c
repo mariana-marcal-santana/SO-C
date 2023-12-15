@@ -43,19 +43,18 @@ int main(int argc, char *argv[]) {
   strcat(dirPath,argv[1]);
   strcat(dirPath,"/");
 
-  fflush(stdout);
-
   // Read the directory
   while ((entry = readdir(dir)) != NULL) {
 
     char currentPath[MAX_PATH_LENGTH];
     char currentPath2[MAX_PATH_LENGTH];
+
       // Check if the file is a .jobs file
       if (strcmp(entry->d_name + strlen(entry->d_name) - 5, ".jobs") == 0) {
         // Set the path to the file
         strcpy(currentPath, dirPath);
         strcat(currentPath, entry->d_name);
-        
+        // Save the stdin and stdout
         int saved_stdin = dup(STDIN_FILENO);
         int saved_stdout = dup(STDOUT_FILENO);
 
@@ -66,7 +65,6 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "File name: %s\n", currentPath);
             continue;
         }
-
         // Set the output file name
         char output_filename[strlen(entry->d_name) + 1];
         strcpy(output_filename, entry->d_name);
@@ -74,7 +72,7 @@ int main(int argc, char *argv[]) {
         output_filename[strlen(entry->d_name)] = '\0';
         strcpy(currentPath2, dirPath);
         strcat(currentPath2, output_filename);
-        
+
         // Open the output file
         int fd_output = open(currentPath2, O_WRONLY | O_CREAT | O_TRUNC, S_IWUSR | S_IRUSR);
         if (fd_output == -1) {
@@ -89,21 +87,16 @@ int main(int argc, char *argv[]) {
           return 1;
         }
 
-        fflush(stdout);
-
+        // Redirect the input and output to the files
         redirectStdinStdout(fd_input , fd_output , saved_stdin , saved_stdout ,"FD");
-
         // Process the file's commands
         ems_process(fd_input, fd_output);
-
+        // Restore the input and output
         redirectStdinStdout(fd_input , fd_output , saved_stdin , saved_stdout ,"STD");
         
-        fflush(stdout);
-
         // Close the files
         close(fd_input);
         close(fd_output);
-
       }
   }
   closedir(dir);

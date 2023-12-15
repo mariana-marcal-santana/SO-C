@@ -60,9 +60,6 @@ static unsigned int* get_seat_with_delay(struct Event* event, size_t index) {
 /// @return Index of the seat.
 static size_t seat_index(struct Event* event, size_t row, size_t col) { return (row - 1) * event->cols + col - 1; }
 
-/// Initializes the EMS state.
-/// @param delay_ms Delay to simulate a real system accessing a costly memory resource.
-/// @return  0 if successful, 1 otherwise.
 int ems_init(unsigned int delay_ms) {
   if (event_list != NULL) {
     fprintf(stderr, "EMS state has already been initialized\n");
@@ -88,11 +85,6 @@ int ems_terminate() {
   return 0;
 }
 
-/// Creates an event.
-/// @param event_id ID of the event to create.
-/// @param num_rows Number of rows of the event.
-/// @param num_cols Number of columns of the event.
-/// @return  0 if successful, 1 otherwise.
 int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
 
   pthread_rwlock_wrlock(&rwlock);
@@ -146,12 +138,6 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
   return 0;
 }
 
-/// Reserves seats for an event.
-/// @param event_id ID of the event to reserve seats for.
-/// @param num_seats Number of seats to reserve.
-/// @param xs Array with the rows of the seats to reserve.
-/// @param ys Array with the columns of the seats to reserve.
-/// @return  0 if successful, 1 otherwise.
 int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys) {
   
   pthread_rwlock_wrlock(&rwlock);
@@ -205,10 +191,6 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
   return 0;
 }
 
-/// Shows an event.
-/// @param event_id ID of the event to show.
-/// @param fd_output File descriptor to write the event to.
-/// @return  0 if successful, 1 otherwise.
 int ems_show(unsigned int event_id, int fd_output) {
   
   pthread_rwlock_wrlock(&rwlock);
@@ -248,9 +230,6 @@ int ems_show(unsigned int event_id, int fd_output) {
   return 0;
 }
 
-/// Lists all events.
-/// @param fd_output File descriptor to write the events to.
-/// @return  0 if successful, 1 otherwise.
 int ems_list_events(int fd_output) {
   
   pthread_rwlock_wrlock(&rwlock);
@@ -284,17 +263,11 @@ int ems_list_events(int fd_output) {
   return 0;
 }
 
-/// Waits for a given delay.
-/// @param delay_ms Delay in milliseconds.
 void ems_wait(unsigned int delay_ms) {
   struct timespec delay = delay_to_timespec(delay_ms);
   nanosleep(&delay, NULL);
 }
 
-/// Processes commands from the input file descriptor and writes the output to the output file descriptor.
-/// @param fd_input File descriptor to read the commands from.
-/// @param fd_output File descriptor to write the output to.
-/// @param num_threads Number of threads to use.
 void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_threads) {
 
   struct Pthread threads[num_threads]; 
@@ -332,12 +305,11 @@ void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_thre
         perror("Error joining thread");
         exit(EXIT_FAILURE);
       }
-      // If the thread returned an exit flag (EOC), free the exitFlag if it is not the last thread
-      if (returnArgs->return_value == 0) { 
+      if (returnArgs->return_value == 0) { // EOC
         free(returnArgs);
-        exitFlag = 0;         //EOC
+        exitFlag = 0;
       } 
-      else if (returnArgs->return_value == 1) { free(returnArgs); } //Barrier
+      else if (returnArgs->return_value == 1) { free(returnArgs); } // BARRIER
     }
     // Free thread list
     free_list_Pthreads(threads, num_threads);
@@ -349,8 +321,6 @@ void ems_process_with_threads(int fd_input, int fd_output, unsigned int num_thre
   }
 }
 
-/// Read commands from the input file descriptor or writes the output to the output file descriptor.
-/// @param arg Arguments to be used by the thread.
 void * ems_process_thread(void *arg) {
   
   struct ThreadArgs *args = (struct ThreadArgs*) arg;
@@ -366,7 +336,7 @@ void * ems_process_thread(void *arg) {
     }
     pthread_rwlock_unlock(&rwlock);
 
-    ///Verify if the thread has to wait before processing the next command
+    // Verify if the thread has to wait before processing the next command
     unsigned int current_thread_index = get_index_thread(args->pthread_list, args->max_threads, (unsigned int *)&args->current_thread_id);
     if (args->pthread_list[current_thread_index].wait > 0) {
       ems_wait(args->pthread_list[current_thread_index].wait);
@@ -375,21 +345,18 @@ void * ems_process_thread(void *arg) {
 
     pthread_mutex_lock(&mutex);
 
-    ///Read next command
+    // Read next command
     while ((cmd = get_next(args->fd_input)) != 10) {
 
       switch (cmd) {
 
         case CMD_CREATE:
           // Process create command
-          
           if (parse_create(args->fd_input, &args->event_id, &args->num_rows, &args->num_columns) != 0) {
             fprintf(stderr, "Invalid CREATE command. See HELP for usage\n");
             //continue;
           }
-        
           pthread_mutex_unlock(&mutex);
-         
           if (ems_create(args->event_id, args->num_rows, args->num_columns)) {
             fprintf(stderr, "Failed to create event\n");
           }
@@ -397,15 +364,12 @@ void * ems_process_thread(void *arg) {
 
         case CMD_RESERVE:
           // Process reserve command
-         
           args->num_coords = parse_reserve(args->fd_input, MAX_RESERVATION_SIZE, &args->event_id, args->xs, args->ys);
-          
           pthread_mutex_unlock(&mutex);
           if (args->num_coords == 0) {
             fprintf(stderr, "Invalid RESERVE command. See HELP for usage\n");
             //continue;
           }
-          
           if (ems_reserve(args->event_id, args->num_coords, args->xs, args->ys)) {
             fprintf(stderr, "Failed to reserve seats\n");
           }
@@ -413,14 +377,11 @@ void * ems_process_thread(void *arg) {
 
         case CMD_SHOW:
           // Process show command
-          
           if (parse_show(args->fd_input, &args->event_id) != 0) {
             fprintf(stderr, "Invalid SHOW command. See HELP for usage\n");
             //continue;
           }
-
           pthread_mutex_unlock(&mutex);
-        
           if (ems_show(args->event_id, args->fd_output)) {
             fprintf(stderr, "Failed to show event\n");
           }
@@ -428,9 +389,7 @@ void * ems_process_thread(void *arg) {
 
         case CMD_LIST_EVENTS:
           // Process list events command
-          
           pthread_mutex_unlock(&mutex);
-        
           if (ems_list_events(args->fd_output)) {
             fprintf(stderr, "Failed to list events\n");
           }
@@ -439,13 +398,11 @@ void * ems_process_thread(void *arg) {
         case CMD_WAIT:
           // Process wait command
           unsigned int id_thread = 0;
-
           if (parse_wait(args->fd_input, &args->delay, &id_thread) == -1) {
             fprintf(stderr, "Invalid WAIT command. See HELP for usage\n");
             //continue;
           }
           pthread_mutex_unlock(&mutex);
-
           // If the thread id is 0, block all threads and wait to restart
           if (args->delay > 0 && id_thread == 0 ) {
             pthread_mutex_lock(&mutex);
@@ -485,7 +442,7 @@ void * ems_process_thread(void *arg) {
           break;
 
         case CMD_BARRIER:
-          //TWait all threads before the barrier to finish and reset all threads after the barrier
+          // Wait all threads before the barrier to finish and reset all threads after the barrier
           pthread_rwlock_wrlock(&rwlock);
           BARRIER_FLAG = 0;
           pthread_rwlock_unlock(&rwlock);
@@ -494,12 +451,10 @@ void * ems_process_thread(void *arg) {
           pthread_exit((void*) args);
 
         case CMD_EMPTY:
-          // Empty command
           pthread_mutex_unlock(&mutex);
           break;
 
         case EOC:
-          // Terminate the program
           pthread_mutex_unlock(&mutex);
           args->return_value = 0;
           pthread_exit((void*) args);

@@ -74,22 +74,21 @@ int main(int argc, char *argv[]) {
     strcat(dirPath,argv[1]);
     strcat(dirPath,"/");
     
- // Read the directory
+    // Read the directory
     struct dirent *entry;
     unsigned int active_processes = 0;
 
     while ((entry = readdir(dir))!= NULL) {
-         
+        // Check if the file is a .jobs file
         if (strcmp(entry->d_name + strlen(entry->d_name) - 5, ".jobs") == 0) {
-
-            while(max_proc==active_processes){
+            // Verify if the maximum number of processes has been reached
+            while(max_proc == active_processes){
                 int status;
                 pid_t terminated_pid ;
                 terminated_pid = wait(&status);
                 printf("Process %d terminated with status %d\n", terminated_pid, status);
                 active_processes--;
-            }
-                
+            } 
             pid_t pid = fork();
             active_processes++;
             if (pid == -1) {
@@ -97,16 +96,14 @@ int main(int argc, char *argv[]) {
                 perror("Failed to fork");
                 exit(EXIT_FAILURE);
             }
-            else if (pid == 0) {
-                    
+            else if (pid == 0) { 
                 // Child process
                 char currentPathIn[MAX_PATH_LENGTH];
                 char currentPathOut[MAX_PATH_LENGTH];
-        
                 // Set the path to the file
                 strcpy(currentPathIn, dirPath);
                 strcat(currentPathIn, entry->d_name);
-
+                // Save the stdin and stdout
                 int saved_stdin = dup(STDIN_FILENO);
                 int saved_stdout = dup(STDOUT_FILENO);
 
@@ -166,7 +163,7 @@ int main(int argc, char *argv[]) {
         }
     }
     // Wait for all the processes to finish
-    while(active_processes>0){
+    while(active_processes > 0){
         int status;
         pid_t terminated_pid ;
         terminated_pid = wait(&status);

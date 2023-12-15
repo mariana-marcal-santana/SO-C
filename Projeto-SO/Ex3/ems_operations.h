@@ -51,6 +51,6 @@ void ems_process_with_threads(int fd_input, int fd_output, unsigned int max_thre
 
 /// Read commands from the input file descriptor or writes the output to the output file descriptor.
 /// @param arg Arguments to be used by the thread.
-void *ems_process_thread(void * args);
+void *ems_process_thread(void *args);
 
 #endif  // EMS_OPERATIONS_H

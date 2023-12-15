@@ -2,17 +2,11 @@
 #include <string.h>
 #include <stdio.h>
 #include <pthread.h>
-#include <semaphore.h>
 #include <stdlib.h>
-#include <sys/wait.h>
-#include <errno.h>
-
 
 #include "constants.h"
 #include "ems_operations.h"
 #include "operations.h"
-
-
 
 void redirectStdinStdout(int fd_input, int fd_output, int saved_stdin, int saved_stdout, char *flag) {
     if (strcmp(flag, "FD") == 0) {

@@ -1,13 +1,13 @@
+// Arguments that are passed to the threads to hold information needed to execute the operations.
 struct ThreadArgs {
-    int fd_input, fd_output, return_value;
-    unsigned int event_id, delay, thread_id;
+    int fd_input, fd_output, return_value, current_thread_id;
+    unsigned int event_id, delay, thread_id, max_threads;
     size_t num_rows, num_columns, num_coords;
     size_t xs[MAX_RESERVATION_SIZE], ys[MAX_RESERVATION_SIZE];
     struct Pthread *pthread_list;
-    unsigned int max_threads;
-    int current_thread_id;
 };
 
+// Auxiliar structure to hold information about the threads.
 struct Pthread{
     int id ;
     pthread_t *thread;   

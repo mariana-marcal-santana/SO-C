@@ -22,8 +22,6 @@ enum Command {
 /// @return The command read.
 enum Command get_next(int fd);
 
-enum Command get_next_threads(int fd, pthread_mutex_t mutex);
-
 /// Parses a CREATE command.
 /// @param fd File descriptor to read from.
 /// @param event_id Pointer to the variable to store the event ID in.

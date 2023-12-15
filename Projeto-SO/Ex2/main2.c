@@ -156,7 +156,7 @@ int main(int argc, char *argv[]) {
     // Wait for all the processes to finish
     while(active_processes>0){
         int status;
-        pid_t terminated_pid ;
+        pid_t terminated_pid;
         terminated_pid = wait(&status);
         printf("Process %d terminated with status %d\n", terminated_pid, status);
         active_processes--;
