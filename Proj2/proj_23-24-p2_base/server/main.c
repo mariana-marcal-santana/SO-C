@@ -36,29 +36,31 @@ void *wait_for_requests_session(void *arg) {
     return NULL;
   }  
   while(1){
-    sem_wait(&semaphore);
+    sem_wait(&semaphore); 
+    int fd_register = open(path_register_FIFO, O_RDONLY);
+    if (fd_register == -1) {
+      fprintf(stderr, "Error opening register pipe\n");
+      return NULL;
+    }
 
-    int fd
+    char buffer[82] ;
+    ssize_t bytes_read = read(fd_register, buffer, 82);
+    if (bytes_read == -1) {
+      fprintf(stderr, "Error reading from register pipe\n");
+      return NULL;
+    }
 
-  
+    if (buffer[0] == '1') {
+      fprintf(stderr, "Received request: %s\n", buffer);
+    }
 
-
+    if (close(fd_register) == -1) {
+      fprintf(stderr, "Error closing register pipe\n");
+      return NULL;
+    }
+    break;
   }
-  
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 int main(int argc, char* argv[]) {
@@ -83,19 +85,8 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  char *name_FIFO = argv[1];
-  
-  size_t len = strlen("../temp/") + strlen(name_FIFO) + 1;
-  char *path_register_FIFO = malloc(len);
-
-
-  if (path_register_FIFO == NULL) {
-        fprintf(stderr, "Failed to allocate memory\n");
-        return 1;
-  }
-
-  snprintf(path_register_FIFO, len, "../temp/%s", name_FIFO);
-
+  char* path_register_FIFO = malloc(strlen(argv[1]) + 1);
+  strcpy(path_register_FIFO, argv[1]);
 
   if (mkfifo(path_register_FIFO, 0777) == -1) {
     fprintf(stderr, "Failed to create register FIFO\n");
@@ -122,5 +113,6 @@ int main(int argc, char* argv[]) {
   //TODO: Close Server
 
   ems_terminate();
+  free(arg);
   free(path_register_FIFO);
 }
