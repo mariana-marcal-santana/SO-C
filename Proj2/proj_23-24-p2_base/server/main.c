@@ -16,7 +16,6 @@
 #include "common/io.h"
 #include "operations.h"
 
-char *path_register_FIFO ; 
 
 struct Client{
   int id_session ;
@@ -25,7 +24,7 @@ struct Client{
   pthread_t thread ;
 };
 
-struct Client clients[MAX_SESSION_COUNT] ;
+struct Client all_clients[MAX_SESSION_COUNT] ;
 
 
 void set_list_Clients(struct Client *clients){
@@ -75,7 +74,7 @@ void * wait_for_requests_operation(void *arg) {
 
 void *wait_for_requests_session(void *arg) {
   
-  set_list_Clients(clients) ;
+  set_list_Clients(all_clients) ;
 
   sem_t semaphore_sessions ;
   char *path_register_FIFO = (char *)arg;
@@ -100,6 +99,7 @@ void *wait_for_requests_session(void *arg) {
       fprintf(stderr, "Error reading from register pipe\n");
       return NULL;
     }
+    printf("buffer: %s\n", buffer_request);
     //Close register pipe
     if (close(fd_register) == -1) {
       fprintf(stderr, "Error closing register pipe\n");
@@ -114,19 +114,11 @@ void *wait_for_requests_session(void *arg) {
     if (request_type[0] == '1') {
       fprintf (stderr, "Request session\n");
       char buffer_response[2];
-      int free_id_session = get_free_index(clients) ;
-      clients[free_id_session].id_session = free_id_session ;
-      char *path_client_request;
-      char *path_client_response;
-      path_client_request = strtok(buffer_request + 1, "\0");
-      path_client_response = strtok(buffer_request + 41, "\0");
+      int free_id_session = get_free_index(all_clients) ;
+      all_clients[free_id_session].id_session = free_id_session ;
+     
 
-
-      
-
-
-
-
+    
     }
     else if (request_type[0] == '0'){
       fprintf (stderr, "Request quit client\n");

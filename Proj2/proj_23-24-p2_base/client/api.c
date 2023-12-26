@@ -46,7 +46,7 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
   buffer[1] = '\0';
 
   strcat(buffer_request, path_request);
-  if (len_request < 40) { memset(buffer_request + len_request , '\0', 40); }
+  if (len_request < 40) { memset(buffer_request + len_request,'\0', 40); }
 
   strcat(buffer_response, path_response);
   if (len_response < 40) { memset(buffer_response + len_response, '\0', 40); }
