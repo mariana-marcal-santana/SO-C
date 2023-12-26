@@ -109,15 +109,19 @@ void *wait_for_requests_session(void *arg) {
     char request_type[2]; // Change the size to 2
     strncpy(request_type, buffer_request, 1); // Copy the first character from buffer to request_type
     request_type[1] = '\0'; // Add null terminator to request_type
-
+    fprintf(stderr,"request_type: %s\n", request_type);
     //Verify request type
     if (request_type[0] == '1') {
       fprintf (stderr, "Request session\n");
       char buffer_response[2];
       int free_id_session = get_free_index(all_clients) ;
       all_clients[free_id_session].id_session = free_id_session ;
-     
-
+      char path_request[40] ;
+      char path_response[40] ;
+      strncpy(path_request, buffer_request + 2, 40);
+      strncpy(path_response, buffer_request + 42, 40);
+      fprintf(stderr,"path_request: %s\n", path_request);
+      fprintf(stderr,"path_response: %s\n", path_response);
     
     }
     else if (request_type[0] == '0'){

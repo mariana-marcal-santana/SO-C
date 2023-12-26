@@ -11,7 +11,7 @@
 int id_session ;
 
 int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const* server_pipe_path) {
-  //TODO: create pipes and connect to the server
+  
   //Create the paths
   size_t len_request =  strlen(req_pipe_path) + 1;
   char *path_request = malloc(len_request);
@@ -42,8 +42,7 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
 
   // Set the message to send to the server
   char buffer[84], buffer_request[40], buffer_response[40];
-  buffer[0] = '1';
-  buffer[1] = '\0';
+  strcpy(buffer, "1\0");
 
   strcat(buffer_request, path_request);
   if (len_request < 40) { memset(buffer_request + len_request,'\0', 40); }
@@ -55,7 +54,7 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
   strcat(buffer, buffer_response);
 
   printf("buffer: %s\n", buffer);
- 
+
   //Send the message to the server
   if (write(fd_server_resquest, buffer, 82) == -1) {
     fprintf(stderr, "Error writing to server pipe\n");
