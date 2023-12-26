@@ -40,29 +40,23 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
     return 1;
   }
 
-  //Set the message to send to the server
-  char buffer[84] ;
-
+  // Set the message to send to the server
+  char buffer[84], buffer_request[40], buffer_response[40];
   buffer[0] = '1';
   buffer[1] = '\0';
 
-  if (len_request < 40){
-    strcat(buffer, path_request);
-    memset(buffer + 2 , '\0', 43); 
-  }
-  else{
-    strcat(buffer, path_request);
-  }
-  if (len_response < 40){
-    strcat(buffer, path_response);
-    memset(buffer + 44 , '\0', 84);
-  }
-  else{
-    strcat(buffer, path_response);
-  }
+  strcat(buffer_request, path_request);
+  if (len_request < 40) { memset(buffer_request + len_request , '\0', 40); }
+
+  strcat(buffer_response, path_response);
+  if (len_response < 40) { memset(buffer_response + len_response, '\0', 40); }
+
+  strcat(buffer, buffer_request);
+  strcat(buffer, buffer_response);
+
+  printf("buffer: %s\n", buffer);
  
   //Send the message to the server
-
   if (write(fd_server_resquest, buffer, 82) == -1) {
     fprintf(stderr, "Error writing to server pipe\n");
     return 1;
