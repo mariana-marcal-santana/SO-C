@@ -41,19 +41,23 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
   }
 
   // Set the message to send to the server
-  char buffer1[84] = "1", buffer_request[40], buffer_response[40];
-  char id_session_char[2];
-  strcat(id_session_char, "1\0");
-  printf("id_session_char: %s", id_session_char);
+  char buffer1[84], buffer_request[40], buffer_response[40];
 
-  strcat(buffer1, id_session_char);
+  /*char id_session_char[2];
+  id_session_char[0] = '1';
+  id_session_char[1] = '\0';
+  printf("id_session_char: %s", id_session_char);
+  strcpy(buffer1, id_session_char);*/
+
+  buffer1[0] = '1';
+  buffer1[1] = '\0';
   printf("buffer: %s\n", buffer1);
 
-  strcat(buffer_request, path_request);
+  strcpy(buffer_request, path_request);
   if (len_request < 40) { memset(buffer_request + len_request,'\0', 40); }
 
-  strcat(buffer_response, path_response);
-  if (len_response < 40) { memset(buffer_response + len_response, '\0', 40); }
+  strcpy(buffer_response, path_response);
+  if (len_response < 40) { memset(buffer_response + len_response,'\0', 40); }
   
   printf("buffer: %s\n", buffer1);
   strcat(buffer1, buffer_request);
