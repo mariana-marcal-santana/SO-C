@@ -114,7 +114,6 @@ void *wait_for_requests_session(void *arg) {
     //Verify request type
     if (request_type[0] == '1') {
       fprintf (stderr, "Request session\n");
-      
       char buffer_response[2];
       int free_id_session = get_free_index(all_clients);
       snprintf(buffer_response, 2, "%d", free_id_session);  
@@ -127,7 +126,7 @@ void *wait_for_requests_session(void *arg) {
       client_response_path[40] = '\0';
       fprintf(stderr, "client_request_path: %s\n", client_request_path);
       fprintf(stderr, "client_response_path: %s\n", client_response_path);
-      
+
       //Open response pipe to send response
       int fd_response = open(path_register_FIFO, O_WRONLY);
       fprintf(stderr, "buffer_response: %s\n", buffer_response);
