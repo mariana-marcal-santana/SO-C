@@ -16,72 +16,118 @@
 #include "common/io.h"
 #include "operations.h"
 
+sem_t semaphore_sessions;
 
-struct Client{
-  int id_session ;
-  char *path_request ;
-  char *path_response ;
-  pthread_t thread ;
+struct Client {
+  int id_session;
+  char *path_request;
+  char *path_response;
+  pthread_t thread;
 };
 
-struct Client all_clients[MAX_SESSION_COUNT] ;
+struct Client all_clients[MAX_SESSION_COUNT];
 
 
-void set_list_Clients(struct Client *clients){
-  for (int i = 0; i < MAX_SESSION_COUNT; i++){
+void set_list_Clients(struct Client *clients) {
+  for (int i = 0; i < MAX_SESSION_COUNT; i++) {
     clients[i].id_session = -1 ;
     clients[i].path_request = NULL ;
     clients[i].path_response = NULL ;
   }
 }
 
-void set_Client(struct Client *clients, int id_session, char *path_request, char *path_response){
-  for (int i = 0; i < MAX_SESSION_COUNT; i++){
-    if (i == id_session){
-      clients[i].id_session = id_session ;
-      clients[i].path_request = path_request ;
-      clients[i].path_response = path_response ;
-      break ;
+void set_Client(struct Client *clients, int id_session, char *path_request, char *path_response) {
+  for (int i = 0; i < MAX_SESSION_COUNT; i++) {
+    if (i == id_session) {
+      clients[i].id_session = id_session;
+      clients[i].path_request = path_request;
+      clients[i].path_response = path_response;
+      break;
     }
   }
 }
 
-void remove_CLient(struct Client *clients, int id_session){
-  for (int i = 0; i < MAX_SESSION_COUNT; i++){
-    if (clients[i].id_session == id_session){
-      clients[i].id_session = -1 ;
-      clients[i].path_request = NULL ;
-      clients[i].path_response = NULL ;
-      break ;
+void remove_Client(struct Client *clients, int id_session) {
+  for (int i = 0; i < MAX_SESSION_COUNT; i++) {
+    if (clients[i].id_session == id_session) {
+      clients[i].id_session = -1;
+      clients[i].path_request = NULL;
+      clients[i].path_response = NULL;
+      break;
     }
   }
 }
 
-int get_free_index(struct Client *clients){
-  for (int i = 0; i < MAX_SESSION_COUNT; i++){
-    if (clients[i].id_session == -1){
-      return i ;
+int get_free_index(struct Client *clients) {
+  for (int i = 0; i < MAX_SESSION_COUNT; i++) {
+    if (clients[i].id_session == -1) {
+      return i;
     }
   }
-  return -1 ;
+  return -1;
 }
 
 void *wait_for_requests(void *arg) {
+  struct Client *client = (struct Client *)arg;
+  
+  while (1) {
+    int fd_request = open(client->path_request, O_RDONLY);
+    if (fd_request == -1) {
+      fprintf(stderr, "Error opening request pipe\n");
+      return NULL;
+    }
+    
+    char buffer_request[530];
+
+    if (read(fd_request, buffer_request, 530) == -1) {
+      fprintf(stderr, "Error reading from request pipe\n");
+      return NULL;
+    }
+
+    if (close(fd_request) == -1) {
+      fprintf(stderr, "Error closing request pipe\n");
+      return NULL;
+    }
+
+    const char op_code_char[1] = {buffer_request[0]}; // Change the size to 1
+    int op_code = atoi(op_code_char);
+    int flag_exit = 0;
+    printf("op_code: %d\n", op_code);
+
+    switch (op_code) {
+      case 2: // ems_quit
+        printf("ems_quit\n");
+        flag_exit = 1;
+        remove_Client(all_clients, client->id_session);
+        unlink(client->path_request);
+        unlink(client->path_response);
+        sem_post(&semaphore_sessions);
+        break;
+      case 3: // ems_create
+        break;
+      case 4: // ems_reserve
+        break;
+      case 5: // ems_show
+        break;
+      case 6: // ems_list_events
+        break;
+    }
+    if (flag_exit == 1) { break; }
+  }
+  pthread_exit(EXIT_SUCCESS);
 }
   
   
 void *wait_for_requests_session(void *arg) {
   
-  set_list_Clients(all_clients) ;
-
-  sem_t semaphore_sessions ;
+  set_list_Clients(all_clients);
   char *path_register_FIFO = (char *)arg;
 
   if (sem_init(&semaphore_sessions, 0, MAX_SESSION_COUNT) == -1) {
     fprintf(stderr, "Failed to initialize semaphore\n");
     return NULL;
   }  
-  while(1){
+  while(1) {
     
     sem_wait(&semaphore_sessions); 
   
@@ -91,9 +137,8 @@ void *wait_for_requests_session(void *arg) {
       fprintf(stderr, "Error opening register pipe\n");
       return NULL;
     }
-    char buffer_request[82] ;
-    ssize_t bytes_read = read(fd_register, buffer_request, 82);
-    if (bytes_read == -1) {
+    char buffer_request[84];
+    if (read(fd_register, buffer_request, 84) == -1) {
       fprintf(stderr, "Error reading from register pipe\n");
       return NULL;
     }
@@ -143,21 +188,9 @@ void *wait_for_requests_session(void *arg) {
         fprintf(stderr, "Error closing response pipe\n");
         return NULL;
       }
-    }
-
-
-    else if (request_type[0] == '0'){
-      fprintf (stderr, "Request quit client\n");
-      //TODO
-    }
-    
+    }    
   }
 }
-
-
-
-
-
 
 int main(int argc, char* argv[]) {
   if (argc < 2 || argc > 3) {
