@@ -8,13 +8,17 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+char const* path_fifo_server;
+
 int id_session ;
 
 int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const* server_pipe_path) {
   
+  path_fifo_server = server_pipe_path;
+
   //Create the paths
   size_t len_request =  strlen(req_pipe_path) + 1;
-  char *path_request = malloc(len_request);
+  char  *path_request = malloc(len_request);
   snprintf(path_request, len_request, "%s", req_pipe_path);
 
   size_t len_response = strlen(resp_pipe_path) + 1;
@@ -41,13 +45,13 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
   }
 
   // Set the message to send to the server
-  char buffer1[84], buffer_request[40], buffer_response[40];
+  char buffer1[84], buffer_request[41], buffer_response[41];
 
   buffer1[0] = '1';
   buffer1[1] = '\0';
 
   strncpy(buffer_request, path_request, sizeof(buffer_request) - 1);
-  buffer_request[sizeof(buffer_request) - 1] = '\0';  // Ensure null termination
+  buffer_request[sizeof(buffer_request)-1] = '\0';  // Ensure null termination
   if (strlen(buffer_request) < 40) {
       memset(buffer_request + strlen(buffer_request), '\0', 40 - strlen(buffer_request));
   }

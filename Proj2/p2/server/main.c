@@ -37,7 +37,7 @@ void set_list_Clients(struct Client *clients){
 
 void set_Client(struct Client *clients, int id_session, char *path_request, char *path_response){
   for (int i = 0; i < MAX_SESSION_COUNT; i++){
-    if (clients[i].id_session == -1){
+    if (i == id_session){
       clients[i].id_session = id_session ;
       clients[i].path_request = path_request ;
       clients[i].path_response = path_response ;
@@ -99,7 +99,7 @@ void *wait_for_requests_session(void *arg) {
       fprintf(stderr, "Error reading from register pipe\n");
       return NULL;
     }
-    printf("buffer: %s\n", buffer_request);
+  
     //Close register pipe
     if (close(fd_register) == -1) {
       fprintf(stderr, "Error closing register pipe\n");
@@ -109,34 +109,44 @@ void *wait_for_requests_session(void *arg) {
     char request_type[2]; // Change the size to 2
     strncpy(request_type, buffer_request, 1); // Copy the first character from buffer to request_type
     request_type[1] = '\0'; // Add null terminator to request_type
-    fprintf(stderr,"request_type: %s\n", request_type);
+ 
+
     //Verify request type
     if (request_type[0] == '1') {
       fprintf (stderr, "Request session\n");
+      
       char buffer_response[2];
-      int free_id_session = get_free_index(all_clients) ;
-      buffer_response[0] = free_id_session + '0' ;
-      buffer_response[1] = '\0' ;
-      all_clients[free_id_session].id_session = free_id_session ;
-      char path_request[40] ;
-      char path_response[40] ;
-      /////////TODO
-
-      set_Client(all_clients, free_id_session, path_request, path_response) ;
-      /////////
+      int free_id_session = get_free_index(all_clients);
+      snprintf(buffer_response, 2, "%d", free_id_session);  
+      fprintf(stderr, "buffer_response: %s\n", buffer_response);
+      char client_request_path[41];
+      char client_response_path[41];
+      strncpy(client_request_path, buffer_request + 1, 40);
+      client_request_path[40] = '\0';
+      strncpy(client_response_path, buffer_request + 41, 40);
+      client_response_path[40] = '\0';
+      fprintf(stderr, "client_request_path: %s\n", client_request_path);
+      fprintf(stderr, "client_response_path: %s\n", client_response_path);
+      
+      //Open response pipe to send response
       int fd_response = open(path_register_FIFO, O_WRONLY);
+      fprintf(stderr, "buffer_response: %s\n", buffer_response);
       if (fd_response == -1) {
         fprintf(stderr, "Error opening response pipe\n");
         return NULL;
       }
-      fprintf(stderr, "buffer_response: %s\n", buffer_response);
+
       //Send response
       if (write(fd_response, buffer_response, 2) == -1) {
         fprintf(stderr, "Error writing to response pipe\n");
         return NULL;
       }
-
-    
+      //Close response pipe
+      if (close(fd_response) == -1) {
+        fprintf(stderr, "Error closing response pipe\n");
+        return NULL;
+      }
+     
     }
     else if (request_type[0] == '0'){
       fprintf (stderr, "Request quit client\n");
@@ -145,6 +155,11 @@ void *wait_for_requests_session(void *arg) {
     
   }
 }
+
+
+
+
+
 
 int main(int argc, char* argv[]) {
   if (argc < 2 || argc > 3) {
