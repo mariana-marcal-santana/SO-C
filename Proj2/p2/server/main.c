@@ -115,13 +115,27 @@ void *wait_for_requests_session(void *arg) {
       fprintf (stderr, "Request session\n");
       char buffer_response[2];
       int free_id_session = get_free_index(all_clients) ;
+      buffer_response[0] = free_id_session + '0' ;
+      buffer_response[1] = '\0' ;
       all_clients[free_id_session].id_session = free_id_session ;
       char path_request[40] ;
       char path_response[40] ;
-      strncpy(path_request, buffer_request + 2, 40);
-      strncpy(path_response, buffer_request + 42, 40);
-      fprintf(stderr,"path_request: %s\n", path_request);
-      fprintf(stderr,"path_response: %s\n", path_response);
+      /////////TODO
+
+      set_Client(all_clients, free_id_session, path_request, path_response) ;
+      /////////
+      int fd_response = open(path_register_FIFO, O_WRONLY);
+      if (fd_response == -1) {
+        fprintf(stderr, "Error opening response pipe\n");
+        return NULL;
+      }
+      fprintf(stderr, "buffer_response: %s\n", buffer_response);
+      //Send response
+      if (write(fd_response, buffer_response, 2) == -1) {
+        fprintf(stderr, "Error writing to response pipe\n");
+        return NULL;
+      }
+
     
     }
     else if (request_type[0] == '0'){

@@ -53,16 +53,16 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
   buffer1[1] = '\0';
   printf("buffer: %s\n", buffer1);
 
-  strcpy(buffer_request, path_request);
-  if (len_request < 40) { memset(buffer_request + len_request,'\0', 40); }
+  strncpy(buffer_request, path_request, sizeof(buffer_request) - 1);
+  buffer_request[sizeof(buffer_request) - 1] = '\0';  // Ensure null termination
 
-  strcpy(buffer_response, path_response);
-  if (len_response < 40) { memset(buffer_response + len_response,'\0', 40); }
-  
+  strncpy(buffer_response, path_response, sizeof(buffer_response) - 1);
+  buffer_response[sizeof(buffer_response) - 1] = '\0';  // Ensure null termination
+
   printf("buffer: %s\n", buffer1);
-  strcat(buffer1, buffer_request);
+  strncat(buffer1, buffer_request, sizeof(buffer1) - strlen(buffer1) - 1);
   printf("buffer: %s\n", buffer1);
-  strcat(buffer1, buffer_response);
+  strncat(buffer1, buffer_response, sizeof(buffer1) - strlen(buffer1) - 1);
 
   printf("buffer: %s\n", buffer1);
 
