@@ -53,17 +53,19 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
   strncpy(buffer_request, path_request, sizeof(buffer_request) - 1);
   buffer_request[sizeof(buffer_request)-1] = '\0';  // Ensure null termination
   if (strlen(buffer_request) < 40) {
-      memset(buffer_request + strlen(buffer_request), '\0', 40 - strlen(buffer_request));
+    memset(buffer_request + strlen(buffer_request), '\0', 40 - strlen(buffer_request));
   }
 
   strncpy(buffer_response, path_response, sizeof(buffer_response) - 1);
   buffer_response[sizeof(buffer_response) - 1] = '\0';  // Ensure null termination
   if (strlen(buffer_response) < 40) {
-      memset(buffer_response + strlen(buffer_response), '\0', 40 - strlen(buffer_response));
+    memset(buffer_response + strlen(buffer_response), '\0', 40 - strlen(buffer_response));
   }
 
-  strncat(buffer1, buffer_request, sizeof(buffer1) - strlen(buffer1) - 1);
-  strncat(buffer1, buffer_response, sizeof(buffer1) - strlen(buffer1) - 1);
+  memcpy(buffer1 + 2, buffer_request, sizeof(buffer_request));
+  memcpy(buffer1 + 42, buffer_response, sizeof(buffer_response));
+  //strncat(buffer1, buffer_request, sizeof(buffer1) - strlen(buffer1) - 1);
+  //strncat(buffer1, buffer_response, sizeof(buffer1) - strlen(buffer1) - 1);
 
   //Send the message to the server
   if (write(fd_server_resquest, buffer1, 82) == -1) {
