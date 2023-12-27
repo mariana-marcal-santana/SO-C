@@ -66,12 +66,10 @@ int get_free_index(struct Client *clients){
   return -1 ;
 }
 
-
-
-void * wait_for_requests_operation(void *arg) {
-  //TODO
+void *wait_for_requests(void *arg) {
 }
-
+  
+  
 void *wait_for_requests_session(void *arg) {
   
   set_list_Clients(all_clients) ;
@@ -110,26 +108,26 @@ void *wait_for_requests_session(void *arg) {
     strncpy(request_type, buffer_request, 1); // Copy the first character from buffer to request_type
     request_type[1] = '\0'; // Add null terminator to request_type
  
-
     //Verify request type
     if (request_type[0] == '1') {
       fprintf (stderr, "Request session\n");
-      char buffer_response[2];
       int free_id_session = get_free_index(all_clients);
-      snprintf(buffer_response, 2, "%d", free_id_session);  
-      fprintf(stderr, "buffer_response: %s\n", buffer_response);
-      char client_request_path[41];
-      char client_response_path[41];
-      strncpy(client_request_path, buffer_request + 1, 40);
-      client_request_path[40] = '\0';
-      strncpy(client_response_path, buffer_request + 41, 40);
-      client_response_path[40] = '\0';
-      fprintf(stderr, "client_request_path: %s\n", client_request_path);
-      fprintf(stderr, "client_response_path: %s\n", client_response_path);
+      
+      char client_request[41], client_response[41];
+      strncpy(client_request, buffer_request + 2, 40);
+      client_request[41] = '\0';  
+      strncpy(client_response, buffer_request + 42, 40);
+      client_response[41] = '\0';
+
+      char buffer_response[2];
+      snprintf(buffer_response, 2, "%d", free_id_session);
+
+      //Set Client
+      set_Client(all_clients, free_id_session, client_request, client_response) ;
+      pthread_create(&all_clients[free_id_session].thread, NULL, wait_for_requests, &all_clients[free_id_session]) ;
 
       //Open response pipe to send response
       int fd_response = open(path_register_FIFO, O_WRONLY);
-      fprintf(stderr, "buffer_response: %s\n", buffer_response);
       if (fd_response == -1) {
         fprintf(stderr, "Error opening response pipe\n");
         return NULL;
@@ -145,8 +143,9 @@ void *wait_for_requests_session(void *arg) {
         fprintf(stderr, "Error closing response pipe\n");
         return NULL;
       }
-     
     }
+
+
     else if (request_type[0] == '0'){
       fprintf (stderr, "Request quit client\n");
       //TODO

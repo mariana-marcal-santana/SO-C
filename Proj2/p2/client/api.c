@@ -27,7 +27,7 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
  
 
   //Connect to the server pipe
-  int fd_server_resquest = open(server_pipe_path, O_WRONLY);
+  int fd_server_resquest = open(path_fifo_server, O_WRONLY);
   if (fd_server_resquest == -1) {
     fprintf(stderr, "Error opening server pipe\n");
     return 1;
@@ -64,12 +64,7 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
 
   memcpy(buffer1 + 2, buffer_request, sizeof(buffer_request) - 1);
   memcpy(buffer1 + 42, buffer_response, sizeof(buffer_response) - 1);
-  buffer1[82] = '\0'; // Ensure null termination
 
-  printf("buffer1: %s\n", buffer1);
-  for (int i = 0; i < 84; ++i) {
-    printf("%c", buffer1[i]);
-  }
   //Send the message to the server
   if (write(fd_server_resquest, buffer1, 82) == -1) {
     fprintf(stderr, "Error writing to server pipe\n");
@@ -84,14 +79,29 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
 
   free(path_request);
   free(path_response);
-
+ 
   //Read the response from the server
-  /*int fd_server_response = open(req_pipe_path, O_RDONLY);
+  int fd_server_response = open(path_fifo_server, O_RDONLY);
   if (fd_server_response == -1) {
     fprintf(stderr, "Error opening server pipe\n");
     return 1;
-  }*/
+  }
+  
+  char buffer2[2];
+  ssize_t bytes_read = read(fd_server_response, buffer2, 2);
+  if (bytes_read == -1) {
+    fprintf(stderr, "Error reading from server pipe\n");
+    return 1;
+  }
+ 
+  //Close the server pipe
+  if (close(fd_server_response) == -1) {
+    fprintf(stderr, "Error closing server pipe\n");
+    return 1;
+  }
 
+  //Set the session id
+  id_session = atoi(buffer2);
   return 0;
 }
 
