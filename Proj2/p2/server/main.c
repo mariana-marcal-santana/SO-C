@@ -15,57 +15,12 @@
 #include "common/constants.h"
 #include "common/io.h"
 #include "operations.h"
+#include "clients_manager.h"
 
 sem_t semaphore_sessions;
 
-struct Client {
-  int id_session;
-  char *path_request;
-  char *path_response;
-  pthread_t thread;
-};
-
 struct Client all_clients[MAX_SESSION_COUNT];
 
-
-void set_list_Clients(struct Client *clients) {
-  for (int i = 0; i < MAX_SESSION_COUNT; i++) {
-    clients[i].id_session = -1 ;
-    clients[i].path_request = NULL ;
-    clients[i].path_response = NULL ;
-  }
-}
-
-void set_Client(struct Client *clients, int id_session, char *path_request, char *path_response) {
-  for (int i = 0; i < MAX_SESSION_COUNT; i++) {
-    if (i == id_session) {
-      clients[i].id_session = id_session;
-      clients[i].path_request = path_request;
-      clients[i].path_response = path_response;
-      break;
-    }
-  }
-}
-
-void remove_Client(struct Client *clients, int id_session) {
-  for (int i = 0; i < MAX_SESSION_COUNT; i++) {
-    if (clients[i].id_session == id_session) {
-      clients[i].id_session = -1;
-      clients[i].path_request = NULL;
-      clients[i].path_response = NULL;
-      break;
-    }
-  }
-}
-
-int get_free_index(struct Client *clients) {
-  for (int i = 0; i < MAX_SESSION_COUNT; i++) {
-    if (clients[i].id_session == -1) {
-      return i;
-    }
-  }
-  return -1;
-}
 
 void *wait_for_requests(void *arg) {
   struct Client *client = (struct Client *)arg;
@@ -97,14 +52,11 @@ void *wait_for_requests(void *arg) {
 
     switch (op_code) {
       case 2: // ems_quit
-        
+                                     
         printf("ems_quit\n");
         flag_exit = 1;
 
-        printf("client->path1 %s\n", client->path_request);
-        printf("client->path2 %s\n", client->path_response);
-        remove_Client(all_clients, client->id_session);
-        if (remove(client->path_request) == -1) {
+        if (unlink(client->path_request) == -1) {
             perror("Error unlinking request pipe");
             return NULL;
         }
@@ -112,6 +64,8 @@ void *wait_for_requests(void *arg) {
           perror("Error unlinking response pipe\n");
           return NULL;
         }
+
+        remove_Client(all_clients, client->id_session);
         if (sem_post(&semaphore_sessions) == -1) {
           fprintf(stderr, "Error posting semaphore\n");
           return NULL;
