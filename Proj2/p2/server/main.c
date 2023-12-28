@@ -10,7 +10,7 @@
 #include <errno.h>
 #include <pthread.h>
 #include <semaphore.h>
-#include <string.h> // Add this line for the strcmp function
+#include <string.h> 
 
 #include "common/constants.h"
 #include "common/io.h"
@@ -18,14 +18,15 @@
 #include "clients_manager.h"
 
 sem_t semaphore_sessions;
+pthread_mutex_t mutex_clients ;
 
 struct Client all_clients[MAX_SESSION_COUNT];
-
 
 void *wait_for_requests(void *arg) {
   struct Client *client = (struct Client *)arg;
   
   while (1) {
+    //Open request pipe to read request
     int fd_request = open(client->path_request, O_RDONLY);
     if (fd_request == -1) {
       fprintf(stderr, "Error opening request pipe\n");
@@ -89,6 +90,12 @@ void *wait_for_requests(void *arg) {
 void *wait_for_requests_session(void *arg) {
   
   set_list_Clients(all_clients);
+
+  if (pthread_mutex_init(&mutex_clients, NULL) != 0) {
+    fprintf(stderr, "Failed to initialize mutex\n");
+    return NULL;
+  }
+
   char *path_register_FIFO = (char *)arg;
 
   if (sem_init(&semaphore_sessions, 0, MAX_SESSION_COUNT) == -1) {
@@ -122,7 +129,7 @@ void *wait_for_requests_session(void *arg) {
     request_type[1] = '\0'; // Add null terminator to request_type
  
     //Verify request type
-    if (request_type[0] == '1') {
+    if (request_type[0] == '1') {               //////////NAO SERA NECESSARIO REALIZAR ESTA VERIFICACAO 
       fprintf (stderr, "Request session\n");
       int free_id_session = get_free_index(all_clients);
       
@@ -184,12 +191,13 @@ int main(int argc, char* argv[]) {
 
   char* path_register_FIFO = malloc(strlen(argv[1]) + 1);
   strcpy(path_register_FIFO, argv[1]);
-
+  //Create register FIFO to receive requests to register new clients
   if (mkfifo(path_register_FIFO, 0777) == -1) {
     fprintf(stderr, "Failed to create register FIFO\n");
     return 1;
   }   
-  
+
+  //Start the main thread to wait for new clients
   pthread_t requests_SESSIONS ;     
   char *arg = malloc(strlen(path_register_FIFO) + 1);
   strcpy(arg, path_register_FIFO);
