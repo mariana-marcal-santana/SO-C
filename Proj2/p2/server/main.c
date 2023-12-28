@@ -89,15 +89,18 @@ void *wait_for_requests(void *arg) {
       return NULL;
     }
 
-    const char op_code_char[1] = {buffer_request[0]}; // Change the size to 1
-    int op_code = atoi(op_code_char);
     int flag_exit = 0;
-    printf("op_code: %d\n", op_code);
+    char op_code_char[2];
+    strncpy(op_code_char, buffer_request, 1);
+    op_code_char[1] = '\0';
+    int op_code = atoi(op_code_char);
 
     switch (op_code) {
       case 2: // ems_quit
         printf("ems_quit\n");
         flag_exit = 1;
+        printf("client->path1 %s\n", client->path_request);
+        printf("client->path2 %s\n", client->path_response);
         remove_Client(all_clients, client->id_session);
         unlink(client->path_request);
         unlink(client->path_response);

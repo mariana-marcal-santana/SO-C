@@ -9,12 +9,16 @@
 #include <sys/types.h>
 
 char const* path_fifo_server;
+char const* path_fifo_request;
+char const* path_fifo_response;
 
 int id_session ;
 
 int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const* server_pipe_path) {
   
   path_fifo_server = server_pipe_path;
+  path_fifo_request = req_pipe_path;
+  path_fifo_response = resp_pipe_path;
 
   //Create the paths
   size_t len_request =  strlen(req_pipe_path) + 1;
@@ -109,8 +113,25 @@ int ems_quit(void) {
   buffer_to_server[0] = '2';
   buffer_to_server[1] = '\0';
   
-  
+  // Make request to server
+  int fd_server_resquest = open(path_fifo_request, O_WRONLY);
+  if (fd_server_resquest == -1) {
+    fprintf(stderr, "Error opening server pipe\n");
+    return 1;
+  }
+  printf("buffer to server %s\n", buffer_to_server);
+  if (write(fd_server_resquest, buffer_to_server, 2) == -1) {
+    fprintf(stderr, "Error writing to server pipe\n");
+    return 1;
+  }
 
+  if (close(fd_server_resquest) == -1) {
+    fprintf(stderr, "Error closing server pipe\n");
+    return 1;
+  }
+
+  
+  
   return 0;
 }
 
