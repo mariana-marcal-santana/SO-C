@@ -97,14 +97,25 @@ void *wait_for_requests(void *arg) {
 
     switch (op_code) {
       case 2: // ems_quit
+        
         printf("ems_quit\n");
         flag_exit = 1;
+
         printf("client->path1 %s\n", client->path_request);
         printf("client->path2 %s\n", client->path_response);
         remove_Client(all_clients, client->id_session);
-        unlink(client->path_request);
-        unlink(client->path_response);
-        sem_post(&semaphore_sessions);
+        if (remove(client->path_request) == -1) {
+            perror("Error unlinking request pipe");
+            return NULL;
+        }
+        if (remove(client->path_response) == -1) {
+          perror("Error unlinking response pipe\n");
+          return NULL;
+        }
+        if (sem_post(&semaphore_sessions) == -1) {
+          fprintf(stderr, "Error posting semaphore\n");
+          return NULL;
+        }
         break;
       case 3: // ems_create
         break;
@@ -224,8 +235,7 @@ int main(int argc, char* argv[]) {
     fprintf(stderr, "Failed to create register FIFO\n");
     return 1;
   }   
-
-
+  
   pthread_t requests_SESSIONS ;     
   char *arg = malloc(strlen(path_register_FIFO) + 1);
   strcpy(arg, path_register_FIFO);
