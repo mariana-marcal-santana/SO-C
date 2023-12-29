@@ -61,6 +61,10 @@ void *worker_thread(void *arg){
 
       printf("op_code: %d\n", op_code);
 
+      // Variables for switch-case
+      int event_id_int, fd_response, return_type;
+      unsigned int event_id;
+
       switch (op_code) {
 
         case 2 : //ems_quit 
@@ -86,15 +90,15 @@ void *worker_thread(void *arg){
         case 3 : //ems_create
           pthread_mutex_unlock(&mutex_workers);
           printf("ems_create\n");
-          int event_id_int = atoi(buffer_request + 2);
-          unsigned int event_id = (unsigned int)event_id_int;
+          event_id_int = atoi(buffer_request + 2);
+          event_id = (unsigned int)event_id_int;
           int num_rows_int = atoi(buffer_request + 6);
           size_t num_rows = (size_t)num_rows_int;
           int num_cols_int = atoi(buffer_request + 10);
           size_t num_cols = (size_t)num_cols_int;
-          int return_type = ems_create(event_id, num_rows, num_cols);
+          return_type = ems_create(event_id, num_rows, num_cols);
 
-          int fd_response = open(worker_thread->path_response, O_WRONLY);
+          fd_response = open(worker_thread->path_response, O_WRONLY);
           if (fd_response == -1) {
             fprintf(stderr, "Error opening response pipe\n");
             exit(EXIT_FAILURE);
@@ -111,8 +115,8 @@ void *worker_thread(void *arg){
 
         case 4 : //reserve
           printf("reserve\n");
-          int event_id_int = atoi(buffer_request + 2);
-          unsigned int event_id = (unsigned int)event_id_int;
+          event_id_int = atoi(buffer_request + 2);
+          event_id = (unsigned int)event_id_int;
           int num_seats_int = atoi(buffer_request + 6);
           size_t num_seats = (size_t)num_seats_int;
           pthread_mutex_unlock(&mutex_workers);
@@ -120,14 +124,16 @@ void *worker_thread(void *arg){
 
         case 5 : //show
           printf("show\n");
-          int event_id_int = atoi(buffer_request + 2);
-          unsigned int event_id = (unsigned int)event_id_int;
-          int fd_response = open(worker_thread->path_response, O_WRONLY);
+          event_id_int = atoi(buffer_request + 2);
+          event_id = (unsigned int)event_id_int;
+          fd_response = open(worker_thread->path_response, O_WRONLY);
           if (fd_response == -1) {
             fprintf(stderr, "Error opening response pipe\n");
             exit(EXIT_FAILURE);
           }
-          int return_type = ems_show(fd_response, event_id);
+
+          ems_show(fd_response, event_id);
+
           if (close(fd_response) == -1) {
             fprintf(stderr, "Error closing response pipe\n");
             exit(EXIT_FAILURE);
@@ -138,12 +144,12 @@ void *worker_thread(void *arg){
 
         case 6 : //ems_list
           printf("ems_list\n");
-          int fd_response = open(worker_thread->path_response, O_WRONLY);
+          fd_response = open(worker_thread->path_response, O_WRONLY);
           if (fd_response == -1) {
             fprintf(stderr, "Error opening response pipe\n");
             exit(EXIT_FAILURE);
           }
-          int return_type = ems_list_events(fd_response);
+          return_type = ems_list_events(fd_response);
           pthread_mutex_unlock(&mutex_workers);
           break;
       }

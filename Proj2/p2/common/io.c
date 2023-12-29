@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdio.h>
 
 int parse_uint(int fd, unsigned int *value, char *next) {
   char buf[16];
@@ -76,4 +77,14 @@ int print_str(int fd, const char *str) {
   }
 
   return 0;
+}
+
+void int_to_buffer(unsigned int num, char* buffer) {
+
+  sprintf(buffer, "%u", num);
+  size_t length = strlen(buffer);
+
+  if (length < 4) {
+    memset(buffer + length, '\0', 4 - length);
+  }
 }
