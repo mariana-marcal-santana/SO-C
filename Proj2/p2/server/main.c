@@ -31,30 +31,29 @@ void *worker_thread(void *arg){
   while (operational){
     
     pthread_cond_wait(&worker_thread->start_cond, &worker_thread->mutex);
-
-    printf("Worker thread %d started\n", worker_thread->id_session);
+    //printf("Worker thread %d started\n", worker_thread->id_session);
     int reset = 1;
 
     pthread_mutex_lock(&mutex_workers);
     while (reset){
-      printf("1\n");
+      //sleep(5);
       int fd_request = open(worker_thread->path_request, O_RDONLY);
       if (fd_request == -1) {
         fprintf(stderr, "Error opening request pipe\n");
         exit(EXIT_FAILURE);
       }
-      printf("2\n");
+
       char buffer_request[530];
       if (read(fd_request, buffer_request, 530) == -1) {
         fprintf(stderr, "Error reading from request pipe\n");
         exit (EXIT_FAILURE);
       }
-      printf("3\n");
+
       if (close(fd_request) == -1) {
         fprintf(stderr, "Error closing request pipe\n");
         exit(EXIT_FAILURE);
       }
-      printf("4\n");
+
       char op_code_char[2];
       strncpy(op_code_char, buffer_request, 1);
       op_code_char[1] = '\0';
@@ -69,8 +68,8 @@ void *worker_thread(void *arg){
           printf("ems_quit\n");
         
           if (unlink(worker_thread->path_request) == -1) {
-              perror("Error unlinking request pipe");
-              continue; 
+            perror("Error unlinking request pipe");
+            continue; 
           }
           if (unlink(worker_thread->path_response) == -1) {
             perror("Error unlinking response pipe\n");
@@ -85,19 +84,66 @@ void *worker_thread(void *arg){
           break;
 
         case 3 : //ems_create
-          printf("ems_create\n");
           pthread_mutex_unlock(&mutex_workers);
+          printf("ems_create\n");
+          int event_id_int = atoi(buffer_request + 2);
+          unsigned int event_id = (unsigned int)event_id_int;
+          int num_rows_int = atoi(buffer_request + 6);
+          size_t num_rows = (size_t)num_rows_int;
+          int num_cols_int = atoi(buffer_request + 10);
+          size_t num_cols = (size_t)num_cols_int;
+          int return_type = ems_create(event_id, num_rows, num_cols);
+
+          int fd_response = open(worker_thread->path_response, O_WRONLY);
+          if (fd_response == -1) {
+            fprintf(stderr, "Error opening response pipe\n");
+            exit(EXIT_FAILURE);
+          }
+          if (write(fd_response, &return_type, sizeof(int)) == -1) {
+            fprintf(stderr, "Error writing to response pipe\n");
+            exit(EXIT_FAILURE);
+          }
+          if (close(fd_response) == -1) {
+            fprintf(stderr, "Error closing response pipe\n");
+            exit(EXIT_FAILURE);
+          }
           break;
+
         case 4 : //reserve
           printf("reserve\n");
+          int event_id_int = atoi(buffer_request + 2);
+          unsigned int event_id = (unsigned int)event_id_int;
+          int num_seats_int = atoi(buffer_request + 6);
+          size_t num_seats = (size_t)num_seats_int;
           pthread_mutex_unlock(&mutex_workers);
           break;
+
         case 5 : //show
           printf("show\n");
+          int event_id_int = atoi(buffer_request + 2);
+          unsigned int event_id = (unsigned int)event_id_int;
+          int fd_response = open(worker_thread->path_response, O_WRONLY);
+          if (fd_response == -1) {
+            fprintf(stderr, "Error opening response pipe\n");
+            exit(EXIT_FAILURE);
+          }
+          int return_type = ems_show(fd_response, event_id);
+          if (close(fd_response) == -1) {
+            fprintf(stderr, "Error closing response pipe\n");
+            exit(EXIT_FAILURE);
+          }
+
           pthread_mutex_unlock(&mutex_workers);
           break;
+
         case 6 : //ems_list
           printf("ems_list\n");
+          int fd_response = open(worker_thread->path_response, O_WRONLY);
+          if (fd_response == -1) {
+            fprintf(stderr, "Error opening response pipe\n");
+            exit(EXIT_FAILURE);
+          }
+          int return_type = ems_list_events(fd_response);
           pthread_mutex_unlock(&mutex_workers);
           break;
       }
@@ -187,7 +233,6 @@ void *product_consumer_queue(void *arg) {
     //Unlock session
     free_worker_thread->free = 1;  
     pthread_cond_signal(&free_worker_thread->start_cond);
-    
   }
 }
 

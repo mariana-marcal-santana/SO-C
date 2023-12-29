@@ -168,7 +168,27 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
     fprintf(stderr, "Error closing server pipe\n");
     return 1;
   }
-  return 0;
+  // Open response pipe
+  int fd_server_response = open(path_fifo_response, O_RDONLY);
+  if (fd_server_response == -1) {
+    fprintf(stderr, "Error opening server pipe\n");
+    return 1;
+  }
+  // Read response
+  char buffer_from_server[1];
+  if (read(fd_server_response, buffer_from_server, 1) == -1) {
+    fprintf(stderr, "Error reading from server pipe\n");
+    return 1;
+  }
+  // Close response pipe
+  if (close(fd_server_response) == -1) {
+    fprintf(stderr, "Error closing server pipe\n");
+    return 1;
+  }
+  // Convert response to int an return
+  int response = atoi(buffer_from_server);
+  printf("response %d\n", response);
+  return response;
 }
 
 int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys) {
@@ -187,6 +207,7 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
   int_to_buffer(num_seats_int, buffer_num_seats);
   memcpy(buffer_to_server + 6, buffer_num_seats, 6);
   // Convert xs and ys to char vector and add to buffer ?????????
+  
   return 0;
 }
 
@@ -214,6 +235,14 @@ int ems_show(int out_fd, unsigned int event_id) {
     fprintf(stderr, "Error closing server pipe\n");
     return 1;
   }
+  // Open response pipe
+  int fd_server_response = open(path_fifo_response, O_RDONLY);
+  if (fd_server_response == -1) {
+    fprintf(stderr, "Error opening server pipe\n");
+    return 1;
+  }
+  // Read response
+  char buffer_from_server[1];
   return 0;
 }
 

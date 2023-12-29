@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <stdbool.h>
 
 void set_list_WorkerThreads(struct Worker_Thread *all_worker_threads) {
   for (int i = 0; i < MAX_SESSION_COUNT; i++) {
@@ -24,8 +23,6 @@ void set_list_WorkerThreads(struct Worker_Thread *all_worker_threads) {
 }
 void reset_WorkerThread(struct Worker_Thread *worker_thread) {
   
-  free(worker_thread->path_request);
-  free(worker_thread->path_response);
   if (pthread_mutex_destroy(&worker_thread->mutex) != 0) {
     fprintf(stderr, "Error destroying mutex\n");
     exit(EXIT_FAILURE);
@@ -35,9 +32,8 @@ void reset_WorkerThread(struct Worker_Thread *worker_thread) {
     exit(EXIT_FAILURE);
   }
   
-  worker_thread->free = 1 ;
-  worker_thread->path_request = malloc(sizeof(char) * 41);
-  worker_thread->path_response = malloc(sizeof(char) * 41);
+  worker_thread->free = 1;
+  
   if (pthread_mutex_init(&worker_thread->mutex, NULL) != 0) {
     fprintf(stderr, "Error initializing mutex\n");
     exit(EXIT_FAILURE);
