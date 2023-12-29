@@ -187,7 +187,6 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
   }
   // Convert response to int an return
   int response = atoi(buffer_from_server);
-  printf("response %d\n", response);
   return response;
 }
 
@@ -209,11 +208,13 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
   char buffer_xs[257];
   for (size_t i = 0; i < num_seats; i++) {
     int_to_buffer((unsigned int)xs[i], buffer_xs + i);
+    printf("xs %s\n", buffer_xs);  // 1 10
   }
   buffer_xs[256] = '\0';
   char buffer_ys[257];
   for (size_t i = 0; i < num_seats; i++) {
     int_to_buffer((unsigned int)ys[i], buffer_ys + i);
+    printf("ys %s\n", buffer_ys);
   }
   buffer_ys[256] = '\0';
   memcpy(buffer_to_server + 12, buffer_xs, 257);
@@ -302,10 +303,7 @@ int ems_show(int out_fd, unsigned int event_id) {
   unsigned int event_rows = (unsigned int) atoi(buffer_from_server+2);
   unsigned int event_cols = (unsigned int) atoi(buffer_from_server+6);
 
-  if (error) {
-    fprintf(stderr, "Error (server) show\n");
-    return 1;
-  }
+  if (error) { return 1; }
 
   unsigned int num_seats = event_rows * event_cols;
   char buffer_seats[num_seats + 1];
@@ -348,7 +346,6 @@ int ems_show(int out_fd, unsigned int event_id) {
       return 1;
     }
   }
-
   return 0;
 }
 

@@ -36,7 +36,7 @@ void *worker_thread(void *arg){
 
     pthread_mutex_lock(&mutex_workers);
     while (reset){
-      //sleep(5);
+      sleep(5);
       int fd_request = open(worker_thread->path_request, O_RDONLY);
       if (fd_request == -1) {
         fprintf(stderr, "Error opening request pipe\n");
@@ -114,12 +114,46 @@ void *worker_thread(void *arg){
           break;
 
         case 4 : //reserve
+          pthread_mutex_unlock(&mutex_workers);
           printf("reserve\n");
+          // Get event_id and num_seats from buffer
           event_id_int = atoi(buffer_request + 2);
           event_id = (unsigned int)event_id_int;
           int num_seats_int = atoi(buffer_request + 6);
           size_t num_seats = (size_t)num_seats_int;
-          pthread_mutex_unlock(&mutex_workers);
+          // Get xs and ys from buffer
+          char xs_char[256], ys_char[256];
+          memcpy(xs_char, buffer_request + 12, 256);
+          memcpy(ys_char, buffer_request + 269, 256);
+          // Convert xs and ys to size_t
+          size_t xs[256], ys[256];
+          for (size_t i = 0; i < num_seats; i++) {
+            if (xs_char[i] == '\0' || ys_char[i] == '\0') { printf("if");
+              break; }
+            xs[i] = (size_t)(xs_char[i] - '0');
+            printf("xs[%ld]: %ld\n", i, xs[i]);
+            ys[i] = (size_t)(ys_char[i] - '0');
+            printf("ys[%ld]: %ld\n", i, ys[i]);
+          }
+          printf("event_id: %d\n", event_id);
+          printf("num_seats: %ld\n", num_seats);
+          return_type = ems_reserve(event_id, num_seats, xs, ys);
+          // Open response pipe
+          fd_response = open(worker_thread->path_response, O_WRONLY);
+          if (fd_response == -1) {
+            fprintf(stderr, "Error opening response pipe\n");
+            exit(EXIT_FAILURE);
+          }
+          // Send response
+          if (write(fd_response, &return_type, sizeof(int)) == -1) {
+            fprintf(stderr, "Error writing to response pipe\n");
+            exit(EXIT_FAILURE);
+          }
+          // Close response pipe
+          if (close(fd_response) == -1) {
+            fprintf(stderr, "Error closing response pipe\n");
+            exit(EXIT_FAILURE);
+          }
           break;
 
         case 5 : //show
