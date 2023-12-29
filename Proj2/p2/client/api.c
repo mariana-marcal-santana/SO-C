@@ -192,7 +192,6 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
 }
 
 int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys) {
-  //TODO: send reserve request to the server (through the request pipe) and wait for the response (through the response pipe)
   char buffer_to_server[527]; // 2 op_code + 4 event_id + 6 num_seats + 257 xs + 257 ys
   buffer_to_server[0] = '4';
   buffer_to_server[1] = '\0';
@@ -206,9 +205,55 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
   char buffer_num_seats[6];
   int_to_buffer(num_seats_int, buffer_num_seats);
   memcpy(buffer_to_server + 6, buffer_num_seats, 6);
-  // Convert xs and ys to char vector and add to buffer ?????????
-  
-  return 0;
+  // Convert xs and ys to char vector and add to buffer
+  char buffer_xs[257];
+  for (size_t i = 0; i < num_seats; i++) {
+    int_to_buffer((unsigned int)xs[i], buffer_xs + i);
+  }
+  buffer_xs[256] = '\0';
+  char buffer_ys[257];
+  for (size_t i = 0; i < num_seats; i++) {
+    int_to_buffer((unsigned int)ys[i], buffer_ys + i);
+  }
+  buffer_ys[256] = '\0';
+  memcpy(buffer_to_server + 12, buffer_xs, 257);
+  memcpy(buffer_to_server + 269, buffer_ys, 257);
+  // Open request pipe
+  int fd_server_resquest = open(path_fifo_request, O_WRONLY);
+  if (fd_server_resquest == -1) {
+    fprintf(stderr, "Error opening server pipe\n");
+    return 1;
+  }
+  // Send request
+  if (write(fd_server_resquest, buffer_to_server, 527) == -1) {
+    fprintf(stderr, "Error writing to server pipe\n");
+    return 1;
+  }
+  // Close request pipe
+  if (close(fd_server_resquest) == -1) {
+    fprintf(stderr, "Error closing server pipe\n");
+    return 1;
+  }
+  // Open response pipe
+  int fd_server_response = open(path_fifo_response, O_RDONLY);
+  if (fd_server_response == -1) {
+    fprintf(stderr, "Error opening server pipe\n");
+    return 1;
+  }
+  // Read response
+  char buffer_from_server[1];
+  if (read(fd_server_response, buffer_from_server, 1) == -1) {
+    fprintf(stderr, "Error reading from server pipe\n");
+    return 1;
+  }
+  // Close response pipe
+  if (close(fd_server_response) == -1) {
+    fprintf(stderr, "Error closing server pipe\n");
+    return 1;
+  }
+  // Convert response to int an return
+  int response = atoi(buffer_from_server);
+  return response;
 }
 
 int ems_show(int out_fd, unsigned int event_id) {
@@ -241,8 +286,69 @@ int ems_show(int out_fd, unsigned int event_id) {
     fprintf(stderr, "Error opening server pipe\n");
     return 1;
   }
-  // Read response
-  char buffer_from_server[1];
+  // Read response fist arguments
+  char buffer_from_server[10];
+  if (read(fd_server_response, buffer_from_server, 10) == -1) {
+    fprintf(stderr, "Error reading from server pipe\n");
+    return 1;
+  }
+  // Close response pipe
+  if (close(fd_server_response) == -1) {
+    fprintf(stderr, "Error closing server pipe\n");
+    return 1;
+  }
+  // Convert response to int an return
+  int error = atoi(buffer_from_server);
+  unsigned int event_rows = (unsigned int) atoi(buffer_from_server+2);
+  unsigned int event_cols = (unsigned int) atoi(buffer_from_server+6);
+
+  if (error) {
+    fprintf(stderr, "Error (server) show\n");
+    return 1;
+  }
+
+  unsigned int num_seats = event_rows * event_cols;
+  char buffer_seats[num_seats + 1];
+  // Open response pipe
+  fd_server_response = open(path_fifo_response, O_RDONLY);
+  if (fd_server_response == -1) {
+    fprintf(stderr, "Error opening server pipe\n");
+    return 1;
+  }
+  // Read response seats
+  if (read(fd_server_response, buffer_seats, num_seats + 1) == -1) {
+    fprintf(stderr, "Error reading from server pipe\n");
+    return 1;
+  }
+  // Close response pipe
+  if (close(fd_server_response) == -1) {
+    fprintf(stderr, "Error closing server pipe\n");
+    return 1;
+  }
+  // Print seats
+  int k = 0;
+  for (size_t i = 0; i < event_rows; i++) {
+    for (size_t j = 0; j < event_cols; j++) {
+      char buffer[16];
+      sprintf(buffer, "%u", buffer_seats[k]);
+      if (print_str(out_fd, buffer)) {
+        perror("Error writing to file descriptor");
+        return 1;
+      }
+      if (j < event_cols) {
+        if (print_str(out_fd, " ")) {
+          perror("Error writing to file descriptor");
+          return 1;
+        }
+      }
+      k++;
+    }
+    if (print_str(out_fd, "\n")) {
+      perror("Error writing to file descriptor");
+      return 1;
+    }
+  }
+
   return 0;
 }
 

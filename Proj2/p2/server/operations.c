@@ -3,6 +3,8 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <pthread.h>
+#include <fcntl.h>
 
 #include "common/io.h"
 #include "eventlist.h"
@@ -173,9 +175,10 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
   return 0;
 }
 
-void ems_show(int fd_response, unsigned int event_id) {
+void ems_show(int fd_response,char * path_response, unsigned int event_id) {
+  
   char error = '0';
-
+  
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
     error = '1';
@@ -244,18 +247,32 @@ void ems_show(int fd_response, unsigned int event_id) {
   }
 
   buffer_seats[num_seats + 1] = '\0';
-  char buffer_to_client[11 + num_seats];
+  char buffer_to_client[10];
   buffer_to_client[0] = error;
   buffer_to_client[1] = '\0';
   unsigned int event_rows = (unsigned int)event->rows;
   unsigned int event_cols = (unsigned int)event->cols;
   int_to_buffer(event_rows, buffer_to_client + 2);
   int_to_buffer(event_cols, buffer_to_client + 6);
-  memcpy(buffer_to_client + 10, buffer_seats, num_seats);
 
-  if (write(fd_response, buffer_to_client, 11 + num_seats) == -1)
+  if (write(fd_response, buffer_to_client, 10 ) == -1)
     perror("Error writing to file descriptor");
 
+  if (close(fd_response) == -1)
+    perror("Error closing file descriptor");
+
+  int fd_response_seats = open(path_response, O_WRONLY);
+  if (fd_response_seats == -1) {
+    fprintf(stderr, "Error opening response pipe\n");
+    exit(EXIT_FAILURE);
+  }
+
+  if (write(fd_response_seats, buffer_seats, num_seats + 1) == -1)
+    perror("Error writing to file descriptor");
+  
+  if (close(fd_response_seats) == -1)
+    perror("Error closing file descriptor");
+  
   pthread_mutex_unlock(&event->mutex);
   return;
 }

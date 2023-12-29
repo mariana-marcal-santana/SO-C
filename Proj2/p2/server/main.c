@@ -132,12 +132,7 @@ void *worker_thread(void *arg){
             exit(EXIT_FAILURE);
           }
 
-          ems_show(fd_response, event_id);
-
-          if (close(fd_response) == -1) {
-            fprintf(stderr, "Error closing response pipe\n");
-            exit(EXIT_FAILURE);
-          }
+          ems_show(fd_response,worker_thread->path_response, event_id);
 
           pthread_mutex_unlock(&mutex_workers);
           break;
