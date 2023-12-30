@@ -36,35 +36,32 @@ void *worker_thread(void *arg){
 
     pthread_mutex_lock(&mutex_workers);
     while (reset){
-      sleep(5);
+ 
       int fd_request = open(worker_thread->path_request, O_RDONLY);
       if (fd_request == -1) {
         fprintf(stderr, "Error opening request pipe\n");
         exit(EXIT_FAILURE);
       }
 
-      char buffer_request[530];
-      if (read(fd_request, buffer_request, 530) == -1) {
-        fprintf(stderr, "Error reading from request pipe\n");
-        exit (EXIT_FAILURE);
-      }
+      int buffer_request[600];
+      ssize_t num_bytes = read(fd_request, buffer_request,sizeof(buffer_request))  ;
+      printf("num_bytes: %ld\n", num_bytes);
+      printf("buffer_request: %d\n", buffer_request[0]);
+      printf("buffer_request: %d\n", buffer_request[1]);
+      printf("buffer_request: %d\n", buffer_request[2]);
+      printf("buffer_request: %d\n", buffer_request[3]);
+      
 
       if (close(fd_request) == -1) {
         fprintf(stderr, "Error closing request pipe\n");
         exit(EXIT_FAILURE);
       }
 
-      char op_code_char[2];
-      strncpy(op_code_char, buffer_request, 1);
-      op_code_char[1] = '\0';
-      int op_code = atoi(op_code_char) ;
-
+      int op_code = buffer_request[0];
       printf("op_code: %d\n", op_code);
-
       // Variables for switch-case
-      int event_id_int, fd_response, return_type;
-      unsigned int event_id;
-
+      int  fd_response, return_type;
+    
       switch (op_code) {
 
         case 2 : //ems_quit 
@@ -90,14 +87,17 @@ void *worker_thread(void *arg){
         case 3 : //ems_create
           pthread_mutex_unlock(&mutex_workers);
           printf("ems_create\n");
-          event_id_int = atoi(buffer_request + 2);
-          event_id = (unsigned int)event_id_int;
-          int num_rows_int = atoi(buffer_request + 6);
-          size_t num_rows = (size_t)num_rows_int;
-          int num_cols_int = atoi(buffer_request + 10);
-          size_t num_cols = (size_t)num_cols_int;
-          return_type = ems_create(event_id, num_rows, num_cols);
 
+          // Get event_id, num_rows and num_cols from buffer
+          unsigned int event_id = (unsigned int) buffer_request[1];
+          size_t num_rows = (size_t) buffer_request[2];
+          size_t num_cols = (size_t) buffer_request[3];
+          printf("event_id: %d\n", event_id);
+          printf("num_rows: %ld\n", num_rows);
+          printf("num_cols: %ld\n", num_cols);
+
+          return_type = ems_create(event_id, num_rows, num_cols);
+    
           fd_response = open(worker_thread->path_response, O_WRONLY);
           if (fd_response == -1) {
             fprintf(stderr, "Error opening response pipe\n");
@@ -116,27 +116,24 @@ void *worker_thread(void *arg){
         case 4 : //reserve
           pthread_mutex_unlock(&mutex_workers);
           printf("reserve\n");
-          // Get event_id and num_seats from buffer
-          event_id_int = atoi(buffer_request + 2);
-          event_id = (unsigned int)event_id_int;
-          int num_seats_int = atoi(buffer_request + 6);
-          size_t num_seats = (size_t)num_seats_int;
-          // Get xs and ys from buffer
-          char xs_char[256], ys_char[256];
-          memcpy(xs_char, buffer_request + 12, 256);
-          memcpy(ys_char, buffer_request + 269, 256);
-          // Convert xs and ys to size_t
-          size_t xs[256], ys[256];
-          for (size_t i = 0; i < num_seats; i++) {
-            if (xs_char[i] == '\0' || ys_char[i] == '\0') { printf("if");
-              break; }
-            xs[i] = (size_t)(xs_char[i] - '0');
-            printf("xs[%ld]: %ld\n", i, xs[i]);
-            ys[i] = (size_t)(ys_char[i] - '0');
-            printf("ys[%ld]: %ld\n", i, ys[i]);
+          // Get event_id, num_seats, xs and ys from buffer
+          event_id = (unsigned int) buffer_request[1];
+          size_t num_seats = (size_t) buffer_request[2];
+          size_t xs[MAX_RESERVATION_SIZE];
+          size_t ys[MAX_RESERVATION_SIZE];
+          for (size_t i = 0; i<num_seats; i++) {
+            if (buffer_request[3 + i] == -1) {
+              break;
+            }
+            xs[i] = (size_t) buffer_request[3 +i];
           }
-          printf("event_id: %d\n", event_id);
-          printf("num_seats: %ld\n", num_seats);
+          for (size_t i = 0; i<num_seats; i++) {
+            if (buffer_request[3 + num_seats + i] == -1) {
+              break;
+            }
+            ys[i] = (size_t) buffer_request[3 + num_seats + i];
+          }
+
           return_type = ems_reserve(event_id, num_seats, xs, ys);
           // Open response pipe
           fd_response = open(worker_thread->path_response, O_WRONLY);
@@ -145,7 +142,7 @@ void *worker_thread(void *arg){
             exit(EXIT_FAILURE);
           }
           // Send response
-          if (write(fd_response, &return_type, sizeof(int)) == -1) {
+          if (write(fd_response, &return_type, sizeof(return_type)) == -1) {
             fprintf(stderr, "Error writing to response pipe\n");
             exit(EXIT_FAILURE);
           }
@@ -158,14 +155,9 @@ void *worker_thread(void *arg){
 
         case 5 : //show
           printf("show\n");
-          event_id_int = atoi(buffer_request + 2);
-          event_id = (unsigned int)event_id_int;
-          fd_response = open(worker_thread->path_response, O_WRONLY);
-          if (fd_response == -1) {
-            fprintf(stderr, "Error opening response pipe\n");
-            exit(EXIT_FAILURE);
-          }
-
+          // Get event_id from buffer
+          event_id = (unsigned int) buffer_request[1];
+          
           ems_show(fd_response,worker_thread->path_response, event_id);
 
           pthread_mutex_unlock(&mutex_workers);
@@ -247,7 +239,7 @@ void *product_consumer_queue(void *arg) {
     int response = free_worker_thread->id_session;
     sprintf(buffer_response, "%d", response); 
     buffer_response[1] = '\0';
-
+    printf("buffer_response: %s\n", buffer_response);
     //Open response pipe to send response
     int fd_response = open(path_register_FIFO, O_WRONLY);
     if (fd_response == -1) {

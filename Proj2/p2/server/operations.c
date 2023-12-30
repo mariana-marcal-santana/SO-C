@@ -177,102 +177,104 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
 
 void ems_show(int fd_response,char * path_response, unsigned int event_id) {
   
-  char error = '0';
+  int first_buffer[3] = {0, 0, 0};
+
+  if (open(path_response, O_WRONLY) == -1) {
+    fprintf(stderr, "Error opening response pipe\n");
+    first_buffer[0] = 1;
+    if (write(fd_response, first_buffer, 3) == -1)
+      perror("Error writing to file descriptor");
+    if (close(fd_response) == -1)
+      perror("Error closing file descriptor");
+    return;
+  }
   
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
-    error = '1';
-    if (write(fd_response, &error, 1) == -1)
+    first_buffer[0] = 1;
+    if (write(fd_response, first_buffer, 3) == -1)
       perror("Error writing to file descriptor");
+    if (close(fd_response) == -1)
+      perror("Error closing file descriptor");
     return;
   }
 
   if (pthread_rwlock_rdlock(&event_list->rwl) != 0) {
     fprintf(stderr, "Error locking list rwl\n");
-    error = '1';
-    if (write(fd_response, &error, 1) == -1)
+    first_buffer[0] = 1;
+    if (write(fd_response, first_buffer, 3) == -1)
       perror("Error writing to file descriptor");
+    if (close(fd_response) == -1)
+      perror("Error closing file descriptor");
+  
     return;
   }
 
   struct Event* event = get_event_with_delay(event_id, event_list->head, event_list->tail);
 
-  size_t num_seats = event->rows * event->cols;
-  char buffer_seats[1 + num_seats];
-
-  pthread_rwlock_unlock(&event_list->rwl);
-
   if (event == NULL) {
     fprintf(stderr, "Event not found\n");
-    error = '1';
-    if (write(fd_response, &error, 1) == -1)
+    first_buffer[0] = 1;
+    if (write(fd_response, first_buffer, 3) == -1)
       perror("Error writing to file descriptor");
+    if (close(fd_response) == -1)
+      perror("Error closing file descriptor");
+    pthread_rwlock_unlock(&event_list->rwl);
     return;
   }
 
   if (pthread_mutex_lock(&event->mutex) != 0) {
     fprintf(stderr, "Error locking mutex\n");
-    error = '1';
-    if (write(fd_response, &error, 1) == -1)
+    first_buffer[0] = 1;
+    if (write(fd_response, first_buffer, 3) == -1)
       perror("Error writing to file descriptor");
+    if (close(fd_response) == -1)
+      perror("Error closing file descriptor");
+    pthread_rwlock_unlock(&event_list->rwl);
     return;
   }
 
-  int k = 0;
+  first_buffer[0] = 0;
+  first_buffer[1] = (int)event->rows;
+  first_buffer[2] = (int)event->cols;
+  
+  if (write(fd_response, first_buffer, 3) == -1) {
+    perror("Error writing to file descriptor");
+    pthread_rwlock_unlock(&event_list->rwl);
+    return;
+  }
+  size_t num_seats = event->rows * event->cols;
+  int response_seats[num_seats + 1 ];
+
+  if (open(path_response, O_WRONLY) == -1) {
+    fprintf(stderr, "Error opening response pipe\n");
+    response_seats[0] = 1;
+    if (write(fd_response, response_seats, num_seats + 1 ) == -1)
+      perror("Error writing to file descriptor");
+    if (close(fd_response) == -1)
+      perror("Error closing file descriptor");
+    return;
+  }
+
+  pthread_rwlock_unlock(&event_list->rwl);
+
   for (size_t i = 1; i <= event->rows; i++) {
     for (size_t j = 1; j <= event->cols; j++) {
-      char buffer[16];
-      sprintf(buffer, "%u", event->data[seat_index(event, i, j)]);
-      buffer_seats[k] = buffer[0];
-      k++;
-      /*if (print_str(out_fd, buffer)) {
-        perror("Error writing to file descriptor");
-        pthread_mutex_unlock(&event->mutex);
-        return 1;
-      }
-
-      if (j < event->cols) {
-        if (print_str(out_fd, " ")) {
-          perror("Error writing to file descriptor");
-          pthread_mutex_unlock(&event->mutex);
-          return 1;
-        }
-      }*/
+      size_t index = seat_index(event, i, j);
+      response_seats[index + 1] =(int) event->data[index];
     }
-    /*if (print_str(out_fd, "\n")) {
-      perror("Error writing to file descriptor");
-      pthread_mutex_unlock(&event->mutex);
-      return 1;
-    }*/
   }
 
-  buffer_seats[num_seats + 1] = '\0';
-  char buffer_to_client[10];
-  buffer_to_client[0] = error;
-  buffer_to_client[1] = '\0';
-  unsigned int event_rows = (unsigned int)event->rows;
-  unsigned int event_cols = (unsigned int)event->cols;
-  int_to_buffer(event_rows, buffer_to_client + 2);
-  int_to_buffer(event_cols, buffer_to_client + 6);
-
-  if (write(fd_response, buffer_to_client, 10 ) == -1)
+  if (write(fd_response, response_seats, num_seats + 1) == -1) {
     perror("Error writing to file descriptor");
-
-  if (close(fd_response) == -1)
-    perror("Error closing file descriptor");
-
-  int fd_response_seats = open(path_response, O_WRONLY);
-  if (fd_response_seats == -1) {
-    fprintf(stderr, "Error opening response pipe\n");
-    exit(EXIT_FAILURE);
+    return;
   }
 
-  if (write(fd_response_seats, buffer_seats, num_seats + 1) == -1)
-    perror("Error writing to file descriptor");
-  
-  if (close(fd_response_seats) == -1)
+  if (close(fd_response) == -1) {
     perror("Error closing file descriptor");
-  
+    return;
+  }
+
   pthread_mutex_unlock(&event->mutex);
   return;
 }
