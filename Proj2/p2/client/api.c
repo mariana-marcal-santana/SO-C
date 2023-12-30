@@ -283,7 +283,7 @@ int ems_show(int out_fd, unsigned int event_id) {
   int num_cols = first_buffer_from_server[2];
   int num_seats = num_rows * num_cols;
   
-  int second_buffer_from_server[num_seats + 1];
+  int second_buffer_from_server[num_seats + 1]; /// ?????????????????????
   fd_server_response = open(path_fifo_response, O_RDONLY);
   if (fd_server_response == -1) {
     fprintf(stderr, "Error opening server pipe\n");
