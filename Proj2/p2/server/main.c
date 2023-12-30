@@ -35,7 +35,7 @@ void *worker_thread(void *arg){
     int reset = 1;
 
     pthread_mutex_lock(&mutex_workers);
-    while (reset){
+    while (reset) {
  
       int fd_request = open(worker_thread->path_request, O_RDONLY);
       if (fd_request == -1) {
@@ -43,14 +43,12 @@ void *worker_thread(void *arg){
         exit(EXIT_FAILURE);
       }
 
-      int buffer_request[600];
-      ssize_t num_bytes = read(fd_request, buffer_request,sizeof(buffer_request))  ;
+      int buffer_request[600] = {0};
+      ssize_t num_bytes = read(fd_request, buffer_request, sizeof(buffer_request));
       printf("num_bytes: %ld\n", num_bytes);
-      printf("buffer_request: %d\n", buffer_request[0]);
-      printf("buffer_request: %d\n", buffer_request[1]);
-      printf("buffer_request: %d\n", buffer_request[2]);
-      printf("buffer_request: %d\n", buffer_request[3]);
-      
+      for (int i = 0; i < 20; i++) {
+        printf("buffer_request[%d]: %d\n", i, buffer_request[i]);
+      }    
 
       if (close(fd_request) == -1) {
         fprintf(stderr, "Error closing request pipe\n");
@@ -128,10 +126,10 @@ void *worker_thread(void *arg){
             xs[i] = (size_t) buffer_request[3 +i];
           }
           for (size_t i = 0; i<num_seats; i++) {
-            if (buffer_request[3 + num_seats + i] == -1) {
+            if (buffer_request[4 + num_seats + i] == 0) {
               break;
             }
-            ys[i] = (size_t) buffer_request[3 + num_seats + i];
+            ys[i] = (size_t) buffer_request[4 + num_seats + i];
           }
 
           return_type = ems_reserve(event_id, num_seats, xs, ys);

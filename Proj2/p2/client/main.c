@@ -54,7 +54,7 @@ int main(int argc, char* argv[]) {
           fprintf(stderr, "Invalid command. See HELP for usage\n");
           continue;
         }
-
+        printf("Creating event %u with %zu rows and %zu columns\n", event_id, num_rows, num_columns);
         if (ems_create(event_id, num_rows, num_columns)) fprintf(stderr, "Failed to create event\n");
         break;
 

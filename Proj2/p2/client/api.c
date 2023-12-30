@@ -134,7 +134,7 @@ int ems_quit(void) {
 
 int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
   
-  int buffer_to_server[4];
+  int buffer_to_server[4] = {0};
   buffer_to_server[0] = 3;
   buffer_to_server[1] = (int) event_id;
   buffer_to_server[2] = (int) num_rows;
@@ -151,7 +151,7 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
     return 1;
   }
   // Send request
-  if (write(fd_server_resquest, buffer_to_server, 4) == -1) {
+  if (write(fd_server_resquest, buffer_to_server, sizeof(buffer_to_server)) == -1) {
     fprintf(stderr, "Error writing to server pipe\n");
     return 1;
   }
@@ -182,10 +182,12 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
 }
 
 int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys) {
-  int buffer_to_server[num_seats * 2 + 3];
+
+  int buffer_to_server[num_seats * 2 + 4];
   buffer_to_server[0] = 4;
   buffer_to_server[1] = (int) event_id;
   buffer_to_server[2] = (int) num_seats;
+
   size_t count = 3;
   for (size_t i = 0; i < num_seats; i++) {
     buffer_to_server[count] = (int) xs[i];
@@ -205,7 +207,7 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
     return 1;
   }
   // Send request
-  if (write(fd_server_resquest, buffer_to_server, 527) == -1) {
+  if (write(fd_server_resquest, buffer_to_server, sizeof(buffer_to_server)) == -1) {
     fprintf(stderr, "Error writing to server pipe\n");
     return 1;
   }
@@ -247,7 +249,7 @@ int ems_show(int out_fd, unsigned int event_id) {
     return 1;
   }
   // Send request
-  if (write(fd_server_resquest, buffer_to_server, 2) == -1) {
+  if (write(fd_server_resquest, buffer_to_server, sizeof(buffer_to_server)) == -1) {
     fprintf(stderr, "Error writing to server pipe\n");
     return 1;
   }
