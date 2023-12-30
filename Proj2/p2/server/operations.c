@@ -244,7 +244,8 @@ void ems_show(int fd_response, char * path_response, unsigned int event_id) {
     return;
   }
   size_t num_seats = event->rows * event->cols;
-  int response_seats[num_seats + 1 ];
+  int response_seats[num_seats + 1];
+  memset(response_seats, 0, sizeof(response_seats));
 
   if (open(path_response, O_WRONLY) == -1) {
     fprintf(stderr, "Error opening response pipe\n");
