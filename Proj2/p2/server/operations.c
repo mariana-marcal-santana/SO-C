@@ -175,7 +175,7 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
   return 0;
 }
 
-void ems_show(int fd_response,char * path_response, unsigned int event_id) {
+void ems_show(int fd_response, char * path_response, unsigned int event_id) {
   
   int first_buffer[3] = {0, 0, 0};
 
@@ -215,7 +215,7 @@ void ems_show(int fd_response,char * path_response, unsigned int event_id) {
   if (event == NULL) {
     fprintf(stderr, "Event not found\n");
     first_buffer[0] = 1;
-    if (write(fd_response, first_buffer, 3) == -1)
+    if (write(fd_response, first_buffer, sizeof(first_buffer)) == -1)
       perror("Error writing to file descriptor");
     if (close(fd_response) == -1)
       perror("Error closing file descriptor");
@@ -226,7 +226,7 @@ void ems_show(int fd_response,char * path_response, unsigned int event_id) {
   if (pthread_mutex_lock(&event->mutex) != 0) {
     fprintf(stderr, "Error locking mutex\n");
     first_buffer[0] = 1;
-    if (write(fd_response, first_buffer, 3) == -1)
+    if (write(fd_response, first_buffer, sizeof(first_buffer)) == -1)
       perror("Error writing to file descriptor");
     if (close(fd_response) == -1)
       perror("Error closing file descriptor");
@@ -238,7 +238,7 @@ void ems_show(int fd_response,char * path_response, unsigned int event_id) {
   first_buffer[1] = (int)event->rows;
   first_buffer[2] = (int)event->cols;
   
-  if (write(fd_response, first_buffer, 3) == -1) {
+  if (write(fd_response, first_buffer, sizeof(first_buffer)) == -1) {
     perror("Error writing to file descriptor");
     pthread_rwlock_unlock(&event_list->rwl);
     return;
@@ -249,7 +249,7 @@ void ems_show(int fd_response,char * path_response, unsigned int event_id) {
   if (open(path_response, O_WRONLY) == -1) {
     fprintf(stderr, "Error opening response pipe\n");
     response_seats[0] = 1;
-    if (write(fd_response, response_seats, num_seats + 1 ) == -1)
+    if (write(fd_response, response_seats, sizeof(response_seats)) == -1)
       perror("Error writing to file descriptor");
     if (close(fd_response) == -1)
       perror("Error closing file descriptor");
@@ -265,7 +265,7 @@ void ems_show(int fd_response,char * path_response, unsigned int event_id) {
     }
   }
 
-  if (write(fd_response, response_seats, num_seats + 1) == -1) {
+  if (write(fd_response, response_seats, sizeof(response_seats)) == -1) {
     perror("Error writing to file descriptor");
     return;
   }

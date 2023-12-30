@@ -168,7 +168,7 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
   }
   // Read response
   int buffer_from_server[1];
-  if (read(fd_server_response, buffer_from_server, 1) == -1) {
+  if (read(fd_server_response, buffer_from_server, sizeof(buffer_from_server)) == -1) {
     fprintf(stderr, "Error reading from server pipe\n");
     return 1;
   }
@@ -265,7 +265,7 @@ int ems_show(int out_fd, unsigned int event_id) {
     fprintf(stderr, "Error opening server pipe\n");
     return 1;
   }
-  if (read(fd_server_response, first_buffer_from_server, 3) == -1) {
+  if (read(fd_server_response, first_buffer_from_server, sizeof(first_buffer_from_server)) == -1) {
     fprintf(stderr, "Error reading from server pipe\n");
     return 1;
   }
@@ -306,12 +306,8 @@ int ems_show(int out_fd, unsigned int event_id) {
   int i = 1;
   while (i <= num_seats) {
     write(out_fd, second_buffer_from_server + i, sizeof(int));
-    if (i % num_cols == 0) {
-      write(out_fd, "\n", 1);
-    }
-    else {
-      write(out_fd, " ", 1);
-    }
+    if (i % num_cols == 0) { write(out_fd, "\n", 1); }
+    else { write(out_fd, " ", 1); }
     i++;
   }
   return 0 ;

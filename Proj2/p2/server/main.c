@@ -156,7 +156,7 @@ void *worker_thread(void *arg){
           // Get event_id from buffer
           event_id = (unsigned int) buffer_request[1];
           
-          ems_show(fd_response,worker_thread->path_response, event_id);
+          ems_show(fd_response, worker_thread->path_response, event_id);
 
           pthread_mutex_unlock(&mutex_workers);
           break;
