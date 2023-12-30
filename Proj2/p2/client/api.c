@@ -376,7 +376,8 @@ int ems_list_events(int out_fd) {
   }
   // Read second response
   int num_events = first_buffer_from_server[1];
-  int second_buffer_from_server[num_events] ;
+  int second_buffer_from_server[num_events];
+  
   fd_server_response = open(path_fifo_response, O_RDONLY);
   if (fd_server_response == -1) {
     fprintf(stderr, "Error opening server pipe\n");

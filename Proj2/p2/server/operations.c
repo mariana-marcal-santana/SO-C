@@ -363,10 +363,10 @@ void ems_list_events(char * path_response) {
   int count = 0;
   while (1) {
     events_ids[count] = (int) (current->event)->id;
-    
     if (current == to) {
       break;
     }
+    count++;
     current = current->next;
   }
 
