@@ -309,24 +309,20 @@ int ems_show(int out_fd, unsigned int event_id) {
   }
   int i = 1;
   while (i <= num_seats) {
-    //char* seat_str = malloc(sizeof(char) * 2);
-    char* seat_str = malloc(sizeof(char) * 2);
-    sprintf(seat_str, "%u", second_buffer_from_server[i]);
-    //char seat[1];
-    //sprintf(seat, "%u", second_buffer_from_server[i]);
-    //int seat_int = snprintf(seat, sizeof(seat), "%d", second_buffer_from_server[i]);
-    if (write(out_fd, seat_str, strlen(seat_str)) == -1) {
+
+    char buffer[16];
+    sprintf(buffer, "%d", second_buffer_from_server[i]);
+    if (print_str(out_fd, buffer)) {
       fprintf(stderr, "Error writing to output file\n");
       return 1;
     }
-    free(seat_str);
     if (i % num_cols == 0) { 
-      if (write(out_fd, "\n", sizeof(char)) == -1) {
+      if (print_str(out_fd, "\n")) {
         fprintf(stderr, "Error writing to output file\n");
       }
     }
     else {
-      if (write(out_fd, " ", sizeof(char)) == -1) {
+      if (print_str(out_fd, " ")) {
         fprintf(stderr, "Error writing to output file\n");
       } 
     }
