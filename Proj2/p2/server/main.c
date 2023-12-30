@@ -156,19 +156,15 @@ void *worker_thread(void *arg){
           // Get event_id from buffer
           event_id = (unsigned int) buffer_request[1];
           
-          ems_show(fd_response, worker_thread->path_response, event_id);
+          ems_show(worker_thread->path_response, event_id);
 
           pthread_mutex_unlock(&mutex_workers);
           break;
 
         case 6 : //ems_list
           printf("ems_list\n");
-          fd_response = open(worker_thread->path_response, O_WRONLY);
-          if (fd_response == -1) {
-            fprintf(stderr, "Error opening response pipe\n");
-            exit(EXIT_FAILURE);
-          }
-          return_type = ems_list_events(fd_response);
+          
+          ems_list_events(worker_thread->path_response);
           pthread_mutex_unlock(&mutex_workers);
           break;
       }
@@ -310,8 +306,13 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
+
   //TODO: Close Server
   ems_terminate();
+  if (unlink(path_register_FIFO) == -1) {
+    fprintf(stderr, "Failed to unlink register FIFO\n");
+    return 1;
+  }
   free(arg);
   free(path_register_FIFO);
 }

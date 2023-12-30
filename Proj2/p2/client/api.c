@@ -333,9 +333,10 @@ int ems_show(int out_fd, unsigned int event_id) {
 
 
 int ems_list_events(int out_fd) {
-  char buffer_to_server[2];
-  buffer_to_server[0] = '6';
-  buffer_to_server[1] = '\0';
+  
+  int buffer_to_server[1] ;
+  buffer_to_server[0] = 6;
+
   // Open request pipe
   int fd_server_resquest = open(path_fifo_request, O_WRONLY);
   if (fd_server_resquest == -1) {
@@ -343,7 +344,7 @@ int ems_list_events(int out_fd) {
     return 1;
   }
   // Send request
-  if (write(fd_server_resquest, buffer_to_server, 2) == -1) {
+  if (write(fd_server_resquest, buffer_to_server, sizeof(buffer_to_server)) == -1) {
     fprintf(stderr, "Error writing to server pipe\n");
     return 1;
   }
@@ -351,6 +352,62 @@ int ems_list_events(int out_fd) {
   if (close(fd_server_resquest) == -1) {
     fprintf(stderr, "Error closing server pipe\n");
     return 1;
+  }
+
+  // Read first response
+  int first_buffer_from_server[2];
+  int fd_server_response = open(path_fifo_response, O_RDONLY);
+  if (fd_server_response == -1) {
+    fprintf(stderr, "Error opening server pipe\n");
+    return 1;
+  }
+  if (read(fd_server_response, first_buffer_from_server, sizeof(first_buffer_from_server)) == -1) {
+    fprintf(stderr, "Error reading from server pipe\n");
+    return 1;
+  }
+  // Close response pipe
+  if (close(fd_server_response) == -1) {
+    fprintf(stderr, "Error closing server pipe\n");
+    return 1;
+  }
+  // Check if response is valid
+  if (first_buffer_from_server[0] == 1) {
+    return 1;
+  }
+  // Read second response
+  int num_events = first_buffer_from_server[1];
+  int second_buffer_from_server[num_events] ;
+  fd_server_response = open(path_fifo_response, O_RDONLY);
+  if (fd_server_response == -1) {
+    fprintf(stderr, "Error opening server pipe\n");
+    return 1;
+  }
+  if (read(fd_server_response, second_buffer_from_server, sizeof(second_buffer_from_server)) == -1) {
+    fprintf(stderr, "Error reading from server pipe\n");
+    return 1;
+  }
+  // Close response pipe
+  if (close(fd_server_response) == -1) {
+    fprintf(stderr, "Error closing server pipe\n");
+    return 1;
+  }
+  
+  // Write response to out_fd
+  for (int i = 0; i < num_events; i++) {
+    if (print_str(out_fd, "Event: ")) {
+      fprintf(stderr, "Error writing to output file\n");
+      return 1;
+    }
+    char buffer[16];
+    sprintf(buffer, "%d", second_buffer_from_server[i]);
+    if (print_str(out_fd, buffer)) {
+      fprintf(stderr, "Error writing to output file\n");
+      return 1;
+    }
+    if (print_str(out_fd, "\n")) {
+      fprintf(stderr, "Error writing to output file\n");
+      return 1;
+    }
   }
   return 0;
 }

@@ -112,6 +112,7 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
     return 1;
   }
 
+  event_list->num_events++;
   pthread_rwlock_unlock(&event_list->rwl);
   return 0;
 }
@@ -175,16 +176,17 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
   return 0;
 }
 
-void ems_show(int fd_response, char * path_response, unsigned int event_id) {
+void ems_show(char * path_response, unsigned int event_id) {
   
-  int first_buffer[3] = {0, 0, 0};
+  int first_buffer[3] = {0};
 
-  if (open(path_response, O_WRONLY) == -1) {
+  int fd_response_1 = open(path_response, O_WRONLY);
+  if (fd_response_1 == -1) {
     fprintf(stderr, "Error opening response pipe\n");
     first_buffer[0] = 1;
-    if (write(fd_response, first_buffer, 3) == -1)
+    if (write(fd_response_1, first_buffer, 3) == -1)
       perror("Error writing to file descriptor");
-    if (close(fd_response) == -1)
+    if (close(fd_response_1) == -1)
       perror("Error closing file descriptor");
     return;
   }
@@ -192,9 +194,9 @@ void ems_show(int fd_response, char * path_response, unsigned int event_id) {
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
     first_buffer[0] = 1;
-    if (write(fd_response, first_buffer, 3) == -1)
+    if (write(fd_response_1, first_buffer, 3) == -1)
       perror("Error writing to file descriptor");
-    if (close(fd_response) == -1)
+    if (close(fd_response_1) == -1)
       perror("Error closing file descriptor");
     return;
   }
@@ -202,9 +204,9 @@ void ems_show(int fd_response, char * path_response, unsigned int event_id) {
   if (pthread_rwlock_rdlock(&event_list->rwl) != 0) {
     fprintf(stderr, "Error locking list rwl\n");
     first_buffer[0] = 1;
-    if (write(fd_response, first_buffer, 3) == -1)
+    if (write(fd_response_1, first_buffer, 3) == -1)
       perror("Error writing to file descriptor");
-    if (close(fd_response) == -1)
+    if (close(fd_response_1) == -1)
       perror("Error closing file descriptor");
   
     return;
@@ -215,9 +217,9 @@ void ems_show(int fd_response, char * path_response, unsigned int event_id) {
   if (event == NULL) {
     fprintf(stderr, "Event not found\n");
     first_buffer[0] = 1;
-    if (write(fd_response, first_buffer, sizeof(first_buffer)) == -1)
+    if (write(fd_response_1, first_buffer, sizeof(first_buffer)) == -1)
       perror("Error writing to file descriptor");
-    if (close(fd_response) == -1)
+    if (close(fd_response_1) == -1)
       perror("Error closing file descriptor");
     pthread_rwlock_unlock(&event_list->rwl);
     return;
@@ -226,9 +228,9 @@ void ems_show(int fd_response, char * path_response, unsigned int event_id) {
   if (pthread_mutex_lock(&event->mutex) != 0) {
     fprintf(stderr, "Error locking mutex\n");
     first_buffer[0] = 1;
-    if (write(fd_response, first_buffer, sizeof(first_buffer)) == -1)
+    if (write(fd_response_1, first_buffer, sizeof(first_buffer)) == -1)
       perror("Error writing to file descriptor");
-    if (close(fd_response) == -1)
+    if (close(fd_response_1) == -1)
       perror("Error closing file descriptor");
     pthread_rwlock_unlock(&event_list->rwl);
     return;
@@ -238,21 +240,30 @@ void ems_show(int fd_response, char * path_response, unsigned int event_id) {
   first_buffer[1] = (int)event->rows;
   first_buffer[2] = (int)event->cols;
   
-  if (write(fd_response, first_buffer, sizeof(first_buffer)) == -1) {
+  if (write(fd_response_1, first_buffer, sizeof(first_buffer)) == -1) {
     perror("Error writing to file descriptor");
     pthread_rwlock_unlock(&event_list->rwl);
     return;
   }
+
+  if (close(fd_response_1) == -1) {
+    perror("Error closing file descriptor");
+    pthread_rwlock_unlock(&event_list->rwl);
+    return;
+  }
+
+
   size_t num_seats = event->rows * event->cols;
   int response_seats[num_seats + 1];
   memset(response_seats, 0, sizeof(response_seats));
 
-  if (open(path_response, O_WRONLY) == -1) {
+  int fd_response_2 = open(path_response, O_WRONLY);
+  if (fd_response_2 == -1){
     fprintf(stderr, "Error opening response pipe\n");
     response_seats[0] = 1;
-    if (write(fd_response, response_seats, sizeof(response_seats)) == -1)
+    if (write(fd_response_2, response_seats, sizeof(response_seats)) == -1)
       perror("Error writing to file descriptor");
-    if (close(fd_response) == -1)
+    if (close(fd_response_2) == -1)
       perror("Error closing file descriptor");
     return;
   }
@@ -266,12 +277,12 @@ void ems_show(int fd_response, char * path_response, unsigned int event_id) {
     }
   }
 
-  if (write(fd_response, response_seats, sizeof(response_seats)) == -1) {
+  if (write(fd_response_2, response_seats, sizeof(response_seats)) == -1) {
     perror("Error writing to file descriptor");
     return;
   }
 
-  if (close(fd_response) == -1) {
+  if (close(fd_response_2) == -1) {
     perror("Error closing file descriptor");
     return;
   }
@@ -280,56 +291,98 @@ void ems_show(int fd_response, char * path_response, unsigned int event_id) {
   return;
 }
 
-int ems_list_events(int out_fd) {
+void ems_list_events(char * path_response) {
+
+  int first_buffer[2] = {0};
+
+  int fd_response_1 = open(path_response, O_WRONLY);
+  if (fd_response_1 == -1) {
+    fprintf(stderr, "Error opening response pipe\n");
+    first_buffer[0] = 1;
+    if (write(fd_response_1, first_buffer, sizeof(first_buffer)) == -1)
+      perror("Error writing to file descriptor");
+    if (close(fd_response_1) == -1)
+      perror("Error closing file descriptor");
+    return;
+  }
+  
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
-    return 1;
+    first_buffer[0] = 1;
+    return ;
   }
 
   if (pthread_rwlock_rdlock(&event_list->rwl) != 0) {
     fprintf(stderr, "Error locking list rwl\n");
-    return 1;
+    first_buffer[0] = 1;
+    return ;
   }
 
   struct ListNode* to = event_list->tail;
   struct ListNode* current = event_list->head;
 
   if (current == NULL) {
-    char buff[] = "No events\n";
-    if (print_str(out_fd, buff)) {
+    first_buffer[0] = 0;
+    if (write(fd_response_1, first_buffer, sizeof(first_buffer)) == -1)
       perror("Error writing to file descriptor");
-      pthread_rwlock_unlock(&event_list->rwl);
-      return 1;
-    }
-
+    if (close(fd_response_1) == -1)
+      perror("Error closing file descriptor");
     pthread_rwlock_unlock(&event_list->rwl);
-    return 0;
+    return;
   }
 
+  first_buffer[0] = 0;
+  first_buffer[1] = (int)event_list->num_events;
+
+  if (write(fd_response_1, first_buffer, sizeof(first_buffer)) == -1) {
+    perror("Error writing to file descriptor");
+    pthread_rwlock_unlock(&event_list->rwl);
+    return;
+  }
+
+  if (close(fd_response_1) == -1) {
+    perror("Error closing file descriptor");
+    pthread_rwlock_unlock(&event_list->rwl);
+    return;
+  }
+  
+  int fd_response_2 = open(path_response, O_WRONLY);
+  if (fd_response_2 == -1) {
+    fprintf(stderr, "Error opening response pipe\n");
+    first_buffer[0] = 1;
+    if (write(fd_response_2, first_buffer, sizeof(first_buffer)) == -1)
+      perror("Error writing to file descriptor");
+    if (close(fd_response_2) == -1)
+      perror("Error closing file descriptor");
+    return;
+  }
+
+  int events_ids[event_list->num_events];
+  memset(events_ids, 0, sizeof(events_ids));
+
+  int count = 0;
   while (1) {
-    char buff[] = "Event: ";
-    if (print_str(out_fd, buff)) {
-      perror("Error writing to file descriptor");
-      pthread_rwlock_unlock(&event_list->rwl);
-      return 1;
-    }
-
-    char id[16];
-    sprintf(id, "%u\n", (current->event)->id);
-    if (print_str(out_fd, id)) {
-      perror("Error writing to file descriptor");
-      pthread_rwlock_unlock(&event_list->rwl);
-      return 1;
-    }
-
+    events_ids[count] = (int) (current->event)->id;
+    
     if (current == to) {
       break;
     }
-
     current = current->next;
   }
 
+  if (write(fd_response_2, events_ids, sizeof(events_ids)) == -1) {
+    perror("Error writing to file descriptor");
+    pthread_rwlock_unlock(&event_list->rwl);
+    return;
+  }
+
+  if (close(fd_response_2) == -1) {
+    perror("Error closing file descriptor");
+    pthread_rwlock_unlock(&event_list->rwl);
+    return;
+  }
+
   pthread_rwlock_unlock(&event_list->rwl);
-  return 0;
+  return ;
 }
 
