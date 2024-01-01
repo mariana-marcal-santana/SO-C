@@ -383,6 +383,6 @@ void ems_list_events(char * path_response) {
   }
 
   pthread_rwlock_unlock(&event_list->rwl);
-  return;
+  return ;
 }
 

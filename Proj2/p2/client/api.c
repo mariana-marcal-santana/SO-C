@@ -140,6 +140,10 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
   buffer_to_server[2] = (int) num_rows;
   buffer_to_server[3] = (int) num_cols;
 
+  for (int i = 0; i < 4; i++) {
+    printf("buffer to server %d\n", buffer_to_server[i]);
+  }
+  
   // Open request pipe
   int fd_server_resquest = open(path_fifo_request, O_WRONLY);
   if (fd_server_resquest == -1) {
@@ -298,7 +302,11 @@ int ems_show(int out_fd, unsigned int event_id) {
   if (second_buffer_from_server[0] == 1) {
     return 1;
   }
-
+  // Write response to out_fd
+  printf("seat buffer:\n");
+  for (int i = 1; i <= num_seats; i++) {
+    printf("%d", second_buffer_from_server[i]);
+  }
   int i = 1;
   while (i <= num_seats) {
 

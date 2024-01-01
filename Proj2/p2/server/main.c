@@ -44,10 +44,11 @@ void *worker_thread(void *arg){
       }
 
       int buffer_request[600] = {0};
-      if (read(fd_request, buffer_request, sizeof(buffer_request)) == -1) {
-        fprintf(stderr, "Error reading from request pipe\n");
-        exit(EXIT_FAILURE);
-      }
+      ssize_t num_bytes = read(fd_request, buffer_request, sizeof(buffer_request));
+      printf("num_bytes: %ld\n", num_bytes);
+      for (int i = 0; i < 20; i++) {
+        printf("buffer_request[%d]: %d\n", i, buffer_request[i]);
+      }    
 
       if (close(fd_request) == -1) {
         fprintf(stderr, "Error closing request pipe\n");
@@ -55,6 +56,7 @@ void *worker_thread(void *arg){
       }
 
       int op_code = buffer_request[0];
+      printf("op_code: %d\n", op_code);
       // Variables for switch-case
       int  fd_response, return_type;
     
@@ -88,6 +90,9 @@ void *worker_thread(void *arg){
           unsigned int event_id = (unsigned int) buffer_request[1];
           size_t num_rows = (size_t) buffer_request[2];
           size_t num_cols = (size_t) buffer_request[3];
+          printf("event_id: %d\n", event_id);
+          printf("num_rows: %ld\n", num_rows);
+          printf("num_cols: %ld\n", num_cols);
 
           return_type = ems_create(event_id, num_rows, num_cols);
     
@@ -108,7 +113,7 @@ void *worker_thread(void *arg){
 
         case 4 : //reserve
           pthread_mutex_unlock(&mutex_workers);
-          printf("ems_reserve\n");
+          printf("reserve\n");
           // Get event_id, num_seats, xs and ys from buffer
           event_id = (unsigned int) buffer_request[1];
           size_t num_seats = (size_t) buffer_request[2];
@@ -147,17 +152,20 @@ void *worker_thread(void *arg){
           break;
 
         case 5 : //show
-          printf("ems_show\n");
-          pthread_mutex_unlock(&mutex_workers);
+          printf("show\n");
           // Get event_id from buffer
           event_id = (unsigned int) buffer_request[1];
+          
           ems_show(worker_thread->path_response, event_id);
+
+          pthread_mutex_unlock(&mutex_workers);
           break;
 
         case 6 : //ems_list
           printf("ems_list\n");
-          pthread_mutex_unlock(&mutex_workers);
+          
           ems_list_events(worker_thread->path_response);
+          pthread_mutex_unlock(&mutex_workers);
           break;
       }
     }
@@ -171,7 +179,7 @@ void *product_consumer_queue(void *arg) {
   set_list_WorkerThreads(all_worker_threads);
 
   for (int i = 0; i < MAX_SESSION_COUNT; i++) {
-    if (pthread_create(&all_worker_threads[i].thread, NULL, worker_thread, &all_worker_threads[i]) != 0) {
+    if(pthread_create(&all_worker_threads[i].thread, NULL, worker_thread, &all_worker_threads[i]) != 0) {
       fprintf(stderr, "Failed to create thread\n");
       return NULL;
     }
@@ -197,6 +205,7 @@ void *product_consumer_queue(void *arg) {
       fprintf(stderr, "Error reading from register pipe\n");
       return NULL;
     }
+  
     //Close register pipe
     if (close(fd_register) == -1) {
       fprintf(stderr, "Error closing register pipe\n");
@@ -216,7 +225,6 @@ void *product_consumer_queue(void *arg) {
 
     //Set session as busy
     free_worker_thread->free = 0;
-    printf("Session %d locked\n", free_worker_thread->id_session);
     free_worker_thread->path_request = client_request;
     free_worker_thread->path_response = client_response;
     
@@ -244,8 +252,7 @@ void *product_consumer_queue(void *arg) {
       return NULL;
     }
     //Unlock session
-    free_worker_thread->free = 1;
-    printf("Session %d unlocked\n", free_worker_thread->id_session);
+    free_worker_thread->free = 1;  
     pthread_cond_signal(&free_worker_thread->start_cond);
   }
 }
