@@ -178,6 +178,7 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
     return 1;
   }
   // Convert response to int an return
+  printf("buffer from server %d\n", buffer_from_server[0]);
   return buffer_from_server[0];
 }
 
@@ -238,11 +239,13 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
 
 int ems_show(int out_fd, unsigned int event_id) {
   //TODO: send show request to the server (through the request pipe) and wait for the response (through the response pipe)
+  printf("show client\n");
   int buffer_to_server[2];
   buffer_to_server[0] = 5;
   buffer_to_server[1] = (int) event_id;
 
   // Open request pipe
+  printf("open1\n");
   int fd_server_resquest = open(path_fifo_request, O_WRONLY);
   if (fd_server_resquest == -1) {
     fprintf(stderr, "Error opening server pipe\n");
@@ -260,6 +263,7 @@ int ems_show(int out_fd, unsigned int event_id) {
   }
   // Read first response
   int first_buffer_from_server[3];
+  printf("open2\n");
   int fd_server_response = open(path_fifo_response, O_RDONLY);
   if (fd_server_response == -1) {
     fprintf(stderr, "Error opening server pipe\n");
@@ -284,6 +288,9 @@ int ems_show(int out_fd, unsigned int event_id) {
   int num_seats = num_rows * num_cols;
   
   int second_buffer_from_server[num_seats + 1]; /// ?????????????????????
+  memset(second_buffer_from_server, 0, sizeof(second_buffer_from_server));
+  
+  printf("open3\n");
   fd_server_response = open(path_fifo_response, O_RDONLY);
   if (fd_server_response == -1) {
     fprintf(stderr, "Error opening server pipe\n");

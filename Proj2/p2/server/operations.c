@@ -180,6 +180,7 @@ void ems_show(char * path_response, unsigned int event_id) {
   
   int first_buffer[3] = {0};
 
+  printf("open1\n");
   int fd_response_1 = open(path_response, O_WRONLY);
   if (fd_response_1 == -1) {
     fprintf(stderr, "Error opening response pipe\n");
@@ -256,7 +257,8 @@ void ems_show(char * path_response, unsigned int event_id) {
   size_t num_seats = event->rows * event->cols;
   int response_seats[num_seats + 1];
   memset(response_seats, 0, sizeof(response_seats));
-
+  
+  printf("open2\n");
   int fd_response_2 = open(path_response, O_WRONLY);
   if (fd_response_2 == -1){
     fprintf(stderr, "Error opening response pipe\n");
