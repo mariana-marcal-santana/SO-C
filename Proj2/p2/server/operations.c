@@ -308,12 +308,6 @@ void ems_list_events(int fd_response) {
     return;
   }
 
-  if (close(fd_response) == -1) {
-    perror("Error closing file descriptor");
-    pthread_rwlock_unlock(&event_list->rwl);
-    return;
-  }
-
   pthread_rwlock_unlock(&event_list->rwl);
   return ;
 }

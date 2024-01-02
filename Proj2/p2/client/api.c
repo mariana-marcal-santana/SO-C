@@ -288,6 +288,7 @@ int ems_list_events(int out_fd) {
   
   // Check if response is valid
   if (first_buffer_from_server[0] == 1) {
+    printf("Error1\n");
     return 1;
   }
   // Read second response
@@ -297,12 +298,10 @@ int ems_list_events(int out_fd) {
   
   if (read(fd_server_response, second_buffer_from_server, sizeof(second_buffer_from_server)) == -1) {
     fprintf(stderr, "Error reading from server pipe\n");
+    printf("Error2\n");
     return 1;
   }
-  // Check if response is valid
-  if (second_buffer_from_server[0] == 1) {
-    return 1;
-  }
+  
   // Write response to out_fd
   for (int i = 0; i < num_events; i++) {
     if (print_str(out_fd, "Event: ")) {
