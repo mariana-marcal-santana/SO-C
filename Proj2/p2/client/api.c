@@ -80,33 +80,10 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
   free(path_request);
   free(path_response);
  
-  //Read the response from the server
-  int fd_register_response = open(path_fifo_server, O_RDONLY);
-  if (fd_register_response == -1) {
-    fprintf(stderr, "Error opening server pipe\n");
-    return 1;
-  }
-  
-  char buffer_from_server[2];
-  ssize_t bytes_read = read(fd_register_response, buffer_from_server, 2);
-  if (bytes_read == -1) {
-    fprintf(stderr, "Error reading from server pipe\n");
-    return 1;
-  }
- 
-  //Close the server pipe
-  if (close(fd_register_response) == -1) {
-    fprintf(stderr, "Error closing server pipe\n");
-    return 1;
-  }
-
-  //Set the session id
-  id_session = atoi(buffer_from_server);
-
   //Open the request pipe
   fd_server_resquest = open(path_fifo_request, O_WRONLY);
   if (fd_server_resquest == -1) {
-    fprintf(stderr, "Error opening request pipe\n");
+    fprintf(stderr, "Error opening request pipe1111\n");
     return 1;
   }
   
@@ -116,6 +93,17 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
     fprintf(stderr, "Error opening response pipe\n");
     return 1;
   }
+
+  //Read the response from the server
+  int buffer_from_server[1];
+  
+  if (read(fd_server_response, buffer_from_server, sizeof(buffer_from_server)) == -1) {
+    fprintf(stderr, "Error reading from server pipe\n");
+    return 1;
+  }
+
+  id_session = buffer_from_server[0];
+
   return 0;
 }
 
@@ -265,7 +253,6 @@ int ems_show(int out_fd, unsigned int event_id) {
   }
   return 0 ;
 }
-
 
 int ems_list_events(int out_fd) {
   
