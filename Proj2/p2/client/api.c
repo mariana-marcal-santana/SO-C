@@ -47,7 +47,7 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
   }
 
   // Set the message to send to the server
-  char buffer_to_server[84], buffer_request[41], buffer_response[41];
+  char buffer_to_server[84] = {'\0'}, buffer_request[41] = {'\0'}, buffer_response[41] = {'\0'};
   buffer_to_server[0] = '1';
   buffer_to_server[1] = '\0';
 

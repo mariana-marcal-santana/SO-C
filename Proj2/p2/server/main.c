@@ -25,21 +25,22 @@ struct Worker_Thread all_worker_threads[MAX_SESSION_COUNT];
 void *worker_thread(void *arg){
  
   struct Worker_Thread *worker_thread = (struct Worker_Thread *)arg;
-  printf("Worker thread: %d\n", worker_thread->id_session);
 
   while (1) {
     
     pthread_cond_wait(&worker_thread->start_cond, &worker_thread->mutex);
+    printf("Worker thread unlocked: %d\n", worker_thread->id_session);
    
     int reset = 1;
     // Open request pipe
+    printf("path_request1: %s \n", worker_thread->path_request);
     int fd_request = open(worker_thread->path_request, O_RDONLY);
     if (fd_request == -1) {
-      fprintf(stderr, "Error opening request pipe222\n");
-      perror("Error opening request pipe");
+      fprintf(stderr, "Error opening request pipe\n");
       exit(EXIT_FAILURE);
     } 
     // Open response pipe
+    printf("path_response1: %s \n", worker_thread->path_response);
     int fd_response = open(worker_thread->path_response, O_WRONLY);
     if (fd_response == -1) {
       fprintf(stderr, "Error opening response pipe\n");
@@ -78,14 +79,18 @@ void *worker_thread(void *arg){
             fprintf(stderr, "Error closing response pipe\n");
             exit(EXIT_FAILURE);
           }
-
+          printf("Worker thread: %d\n", worker_thread->id_session);
           //Unlink request and response pipes
+          printf("path_request: %s \n", worker_thread->path_request);
           if (unlink(worker_thread->path_request) == -1) {
             fprintf(stderr, "Error unlinking request pipe\n");
+            perror("Error unlinking request pipe");
             exit(EXIT_FAILURE);
           }
+          printf("path_response: %s \n", worker_thread->path_response);
           if (unlink(worker_thread->path_response) == -1) {
             fprintf(stderr, "Error unlinking response pipe\n");
+            perror("Error unlinking response pipe");
             exit(EXIT_FAILURE);
           }
           
@@ -189,39 +194,44 @@ void *product_consumer_queue(void *arg) {
   
   while(1) {
     // Read request from client
-    char buffer_request[84];
-    printf("Waiting for request\n");
-    if (read(fd_register, buffer_request, sizeof(buffer_request)) == -1) {
+    char buffer_request[84] = {'\0'};
+    ssize_t bytes_read = read(fd_register, buffer_request, sizeof(buffer_request));
+    if (bytes_read == -1) {
       fprintf(stderr, "Error reading from register pipe\n");
       break;
     }
-    for (int i = 0; i < 84; i++) {
-      printf("Buffer: %d\n", buffer_request[i]);
+    if (bytes_read != 0) {
+
+      printf("Request: %s\n", buffer_request);
+      printf("Request: %s\n", buffer_request + 2);
+      printf("Request: %s\n", buffer_request + 42);
+      // Wait for new session
+      sem_wait(&semaphore_sessions);
+      fprintf (stderr, "Request session\n");
+      //Get free session 
+      struct Worker_Thread *free_worker_thread = get_free_worker_thread(all_worker_threads);
+      printf("Free Worker thread: %d\n", free_worker_thread->id_session);
+      char client_request[41], client_response[41];
+      strncpy(client_request, buffer_request + 2, 40);
+      client_request[41] = '\0';  
+      strncpy(client_response, buffer_request + 42, 40);
+      client_response[41] = '\0';
+      //Set session as busy
+      if (free_worker_thread->free) {
+        memcpy(free_worker_thread->path_request, client_request, sizeof(client_request));
+        memcpy(free_worker_thread->path_response, client_response, sizeof(client_response));
+        //free_worker_thread->path_request = client_request;
+        //free_worker_thread->path_response = client_response;
+      }
+      free_worker_thread->free = 0;
+      
+      struct Worker_Thread *thread_0 = &all_worker_threads[0];
+      printf("path_request_thread_0: %s \n", thread_0->path_request);
+      printf("path_response_thread_0: %s \n", thread_0->path_response);
+      //Unlock session
+      printf("Unlock session\n");
+      pthread_cond_signal(&free_worker_thread->start_cond);
     }
-    printf("Request received\n");
-    // Wait for new session
-    sem_wait(&semaphore_sessions);
-
-    fprintf (stderr, "Request session\n");
-    //Get free session 
-    struct Worker_Thread *free_worker_thread = get_free_worker_thread(all_worker_threads);
-    
-    char client_request[41], client_response[41];
-    strncpy(client_request, buffer_request + 2, 40);
-    client_request[41] = '\0';  
-    strncpy(client_response, buffer_request + 42, 40);
-    client_response[41] = '\0';
-
-    printf("Request: %s\n", client_request);
-    printf("Response: %s\n", client_response);
-
-    //Set session as busy
-    free_worker_thread->free = 0;
-    free_worker_thread->path_request = client_request;
-    free_worker_thread->path_response = client_response;
-    //Unlock session
-    printf("Unlock session\n");
-    pthread_cond_signal(&free_worker_thread->start_cond);
   }
 
   //Close register and response pipes
