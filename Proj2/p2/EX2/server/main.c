@@ -30,8 +30,7 @@ void *worker_thread(void *arg){
     
     pthread_cond_wait(&worker_thread->start_cond, &worker_thread->mutex);
     printf("Worker thread unlocked: %d\n", worker_thread->id_session);
-    sleep(5);
-   
+ 
     int reset = 1;
     // Open request pipe
     printf("path_request1: %s \n", worker_thread->path_request);
