@@ -55,9 +55,7 @@ void *worker_thread(void *arg){
         exit(EXIT_FAILURE);
       }                     
 
-      int op_code = buffer_request[0];
-      printf("op_code: %d\n", op_code);
-      
+      int op_code = buffer_request[0];      
       int return_type = 0;
       unsigned int event_id;
     
