@@ -54,7 +54,7 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
   strncpy(buffer_request, path_request, sizeof(buffer_request) - 1);
   buffer_request[sizeof(buffer_request) - 1] = '\0';  // Ensure null termination
   if (strlen(buffer_request) < 40) {
-    memset(buffer_request + strlen(buffer_request), '\0', 40 - strlen(buffer_request));
+    memset(buffer_request + strlen(buffer_request), '\0', 40 - strlen(buffer_request) + 1);
   }
 
   strncpy(buffer_response, path_response, sizeof(buffer_response) - 1);
@@ -67,7 +67,7 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
   memcpy(buffer_to_server + 42, buffer_response, sizeof(buffer_response) - 1);
 
   //Send the message to the server
-  if (write(fd_register_request, buffer_to_server, 82) == -1) {
+  if (write(fd_register_request, buffer_to_server, sizeof(buffer_to_server)) == -1) {
     fprintf(stderr, "Error writing to server pipe\n");
     return 1;
   }

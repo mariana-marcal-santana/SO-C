@@ -85,8 +85,7 @@ void *worker_thread(void *arg){
           
           // Reset session
           reset_WorkerThread(worker_thread);
-          perror("free = 1");
-  
+
           if (sem_post(&semaphore_sessions) == -1) {
             fprintf(stderr, "Error posting semaphore\n");
             continue;
@@ -159,7 +158,6 @@ void *worker_thread(void *arg){
   exit(EXIT_SUCCESS); 
 }
 
-
 void *product_consumer_queue(void *arg) {
   
   set_list_WorkerThreads(all_worker_threads);
@@ -191,11 +189,51 @@ void *product_consumer_queue(void *arg) {
   while(1) {
     // Read request from client
     char buffer_request[84];
-    if (read(fd_register, buffer_request, 84) == -1) {
+    ssize_t bytes_read = read(fd_register, buffer_request, sizeof(buffer_request)); 
+    if (bytes_read == -1) {
       fprintf(stderr, "Error reading from register pipe\n");
       break;
     }
-    // Wait for new session
+    if (bytes_read == 84) {
+      printf("read %ld bytes\n", bytes_read);
+      printf("buffer_request: %s\n", buffer_request);
+
+      // Wait for new session
+      sem_wait(&semaphore_sessions);
+
+      fprintf (stderr, "Request session\n");
+      //Get free session 
+      struct Worker_Thread *free_worker_thread = get_free_worker_thread(all_worker_threads);
+      
+      char client_request[41], client_response[41];
+      strncpy(client_request, buffer_request + 2, 40);
+      client_request[41] = '\0';  
+      strncpy(client_response, buffer_request + 42, 40);
+      client_response[41] = '\0';
+
+      //Set session as busy
+      free_worker_thread->free = 0;
+      free_worker_thread->path_request = client_request;
+      free_worker_thread->path_response = client_response;
+      
+      //Create response
+      char buffer_response[2];
+      int response = free_worker_thread->id_session;
+      sprintf(buffer_response, "%d", response); 
+      buffer_response[1] = '\0';
+      printf("buffer_response: %s\n", buffer_response);
+      
+      //Send response
+      if (write(fd_response, buffer_response, sizeof(buffer_response)) == -1) {
+        fprintf(stderr, "Error writing to response pipe\n");
+        break;
+      }
+      
+      //Unlock session
+      printf("Unlock session\n");
+      pthread_cond_signal(&free_worker_thread->start_cond);
+    }
+    /*// Wait for new session
     sem_wait(&semaphore_sessions);
 
     fprintf (stderr, "Request session\n");
@@ -221,14 +259,14 @@ void *product_consumer_queue(void *arg) {
     printf("buffer_response: %s\n", buffer_response);
     
     //Send response
-    if (write(fd_response, buffer_response, 2) == -1) {
+    if (write(fd_response, buffer_response, sizeof(buffer_response)) == -1) {
       fprintf(stderr, "Error writing to response pipe\n");
       break;
     }
     
     //Unlock session
     printf("Unlock session\n");
-    pthread_cond_signal(&free_worker_thread->start_cond);
+    pthread_cond_signal(&free_worker_thread->start_cond);*/
   }
 
   //Close register and response pipes
