@@ -201,7 +201,6 @@ void *product_consumer_queue(void *arg) {
       break;
     }
     if (bytes_read != 0) {
-
       printf("Request: %s\n", buffer_request);
       printf("Request: %s\n", buffer_request + 2);
       printf("Request: %s\n", buffer_request + 42);
@@ -220,14 +219,8 @@ void *product_consumer_queue(void *arg) {
       if (free_worker_thread->free) {
         memcpy(free_worker_thread->path_request, client_request, sizeof(client_request));
         memcpy(free_worker_thread->path_response, client_response, sizeof(client_response));
-        //free_worker_thread->path_request = client_request;
-        //free_worker_thread->path_response = client_response;
       }
       free_worker_thread->free = 0;
-      
-      struct Worker_Thread *thread_0 = &all_worker_threads[0];
-      printf("path_request_thread_0: %s \n", thread_0->path_request);
-      printf("path_response_thread_0: %s \n", thread_0->path_response);
       //Unlock session
       printf("Unlock session\n");
       pthread_cond_signal(&free_worker_thread->start_cond);
