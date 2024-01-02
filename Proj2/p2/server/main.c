@@ -23,10 +23,11 @@ pthread_mutex_t mutex_workers ;
 struct Worker_Thread all_worker_threads[MAX_SESSION_COUNT];
 
 void *worker_thread(void *arg){
-
+ 
   struct Worker_Thread *worker_thread = (struct Worker_Thread *)arg;
-  
-  while (1){
+  printf("Worker thread: %d\n", worker_thread->id_session);
+
+  while (1) {
     
     pthread_cond_wait(&worker_thread->start_cond, &worker_thread->mutex);
    
@@ -58,31 +59,27 @@ void *worker_thread(void *arg){
       printf("op_code: %d\n", op_code);
       
       int return_type = 0;
-      unsigned int event_id ;
+      unsigned int event_id;
     
       switch (op_code) {
-
         case 2 : //ems_quit 
           pthread_mutex_unlock(&mutex_workers);
           printf("ems_quit\n");
-
-          // Close request pipe
+          // Close request and response pipes
           if (close(fd_request) == -1) {
             fprintf(stderr, "Error closing request pipe\n");
             exit(EXIT_FAILURE);
           }
-          // Close response pipe
           if (close(fd_response) == -1) {
             fprintf(stderr, "Error closing response pipe\n");
             exit(EXIT_FAILURE);
           }
 
-          //Unlink request pipe
+          //Unlink request and response pipes
           if (unlink(worker_thread->path_request) == -1) {
             fprintf(stderr, "Error unlinking request pipe\n");
             exit(EXIT_FAILURE);
           }
-          //Unlink response pipe
           if (unlink(worker_thread->path_response) == -1) {
             fprintf(stderr, "Error unlinking response pipe\n");
             exit(EXIT_FAILURE);
@@ -90,6 +87,7 @@ void *worker_thread(void *arg){
           
           // Reset session
           reset_WorkerThread(worker_thread);
+          perror("free = 1");
   
           if (sem_post(&semaphore_sessions) == -1) {
             fprintf(stderr, "Error posting semaphore\n");
@@ -101,14 +99,10 @@ void *worker_thread(void *arg){
         case 3 : //ems_create
           pthread_mutex_unlock(&mutex_workers);
           printf("ems_create\n");
-
           // Get event_id, num_rows and num_cols from buffer
           event_id = (unsigned int) buffer_request[1];
           size_t num_rows = (size_t) buffer_request[2];
           size_t num_cols = (size_t) buffer_request[3];
-          printf("event_id: %d\n", event_id);
-          printf("num_rows: %ld\n", num_rows);
-          printf("num_cols: %ld\n", num_cols);
 
           return_type = ems_create(event_id, num_rows, num_cols);
     
@@ -116,7 +110,6 @@ void *worker_thread(void *arg){
             fprintf(stderr, "Error writing to response pipe\n");
             exit(EXIT_FAILURE);
           }
-  
           break;
 
         case 4 : //reserve
@@ -161,7 +154,6 @@ void *worker_thread(void *arg){
           printf("ems_list\n");
           pthread_mutex_unlock(&mutex_workers);
           ems_list_events(fd_response);
-        
           break;
       }
     }
@@ -175,24 +167,23 @@ void *product_consumer_queue(void *arg) {
   set_list_WorkerThreads(all_worker_threads);
 
   for (int i = 0; i < MAX_SESSION_COUNT; i++) {
-    if(pthread_create(&all_worker_threads[i].thread, NULL, worker_thread, &all_worker_threads[i]) != 0) {
+    if (pthread_create(&all_worker_threads[i].thread, NULL, worker_thread, &all_worker_threads[i]) != 0) {
       fprintf(stderr, "Failed to create thread\n");
       return NULL;
     }
   }
   char *path_register_FIFO = (char *)arg;
-
+  // Initialize semaphore
   if (sem_init(&semaphore_sessions, 0, MAX_SESSION_COUNT) == -1) {
     fprintf(stderr, "Failed to initialize semaphore\n");
     return NULL;
   }  
-
+  // Open register and response pipes
   int fd_register = open(path_register_FIFO, O_RDONLY);
   if (fd_register == -1) {
     fprintf(stderr, "Error opening register pipe\n");
     return NULL;
   }
-
   int fd_response = open(path_register_FIFO, O_WRONLY);
   if (fd_response == -1) {
     fprintf(stderr, "Error opening response pipe\n");
@@ -200,16 +191,14 @@ void *product_consumer_queue(void *arg) {
   }
 
   while(1) {
-    
-    sem_wait(&semaphore_sessions); 
-  
-    //Open register pipe to read request
-    
+    // Read request from client
     char buffer_request[84];
     if (read(fd_register, buffer_request, 84) == -1) {
       fprintf(stderr, "Error reading from register pipe\n");
       break;
     }
+    // Wait for new session
+    sem_wait(&semaphore_sessions);
 
     fprintf (stderr, "Request session\n");
     //Get free session 
@@ -240,15 +229,15 @@ void *product_consumer_queue(void *arg) {
     }
     
     //Unlock session
+    printf("Unlock session\n");
     pthread_cond_signal(&free_worker_thread->start_cond);
   }
 
-  //Close register pipe
+  //Close register and response pipes
   if (close(fd_register) == -1) {
     fprintf(stderr, "Error closing register pipe\n");
     return NULL;
   }
-  //Close response pipe
   if (close(fd_response) == -1) {
     fprintf(stderr, "Error closing response pipe\n");
     return NULL;

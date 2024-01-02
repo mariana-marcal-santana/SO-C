@@ -9,9 +9,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-char const* path_fifo_server;
-char const* path_fifo_request;
-char const* path_fifo_response;
 int fd_server_resquest;
 int fd_server_response;
 
@@ -19,9 +16,9 @@ int id_session;
 
 int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const* server_pipe_path) {
   
-  path_fifo_server = server_pipe_path;
-  path_fifo_request = req_pipe_path;
-  path_fifo_response = resp_pipe_path;
+  char const *path_fifo_server = server_pipe_path;
+  char const *path_fifo_request = req_pipe_path;
+  char const *path_fifo_response = resp_pipe_path;
 
   //Create the paths
   size_t len_request =  strlen(req_pipe_path) + 1;
@@ -33,8 +30,8 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
   snprintf(path_response, len_response, "%s", resp_pipe_path);
  
   //Connect to the server pipe
-  fd_server_resquest = open(path_fifo_server, O_WRONLY);
-  if (fd_server_resquest == -1) {
+  int fd_register_request = open(path_fifo_server, O_WRONLY);
+  if (fd_register_request == -1) {
     fprintf(stderr, "Error opening server pipe\n");
     return 1;
   }
@@ -51,7 +48,6 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
 
   // Set the message to send to the server
   char buffer_to_server[84], buffer_request[41], buffer_response[41];
-
   buffer_to_server[0] = '1';
   buffer_to_server[1] = '\0';
 
@@ -71,8 +67,13 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
   memcpy(buffer_to_server + 42, buffer_response, sizeof(buffer_response) - 1);
 
   //Send the message to the server
-  if (write(fd_server_resquest, buffer_to_server, 82) == -1) {
+  if (write(fd_register_request, buffer_to_server, 82) == -1) {
     fprintf(stderr, "Error writing to server pipe\n");
+    return 1;
+  }
+  // Close the server pipe
+  if (close(fd_register_request) == -1) {
+    fprintf(stderr, "Error closing server pipe\n");
     return 1;
   }
 
@@ -80,21 +81,21 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
   free(path_response);
  
   //Read the response from the server
-  fd_server_response = open(path_fifo_server, O_RDONLY);
-  if (fd_server_response == -1) {
+  int fd_register_response = open(path_fifo_server, O_RDONLY);
+  if (fd_register_response == -1) {
     fprintf(stderr, "Error opening server pipe\n");
     return 1;
   }
   
   char buffer_from_server[2];
-  ssize_t bytes_read = read(fd_server_response, buffer_from_server, 2);
+  ssize_t bytes_read = read(fd_register_response, buffer_from_server, 2);
   if (bytes_read == -1) {
     fprintf(stderr, "Error reading from server pipe\n");
     return 1;
   }
  
   //Close the server pipe
-  if (close(fd_server_response) == -1) {
+  if (close(fd_register_response) == -1) {
     fprintf(stderr, "Error closing server pipe\n");
     return 1;
   }

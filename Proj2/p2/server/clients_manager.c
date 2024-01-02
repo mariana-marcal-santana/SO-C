@@ -22,7 +22,7 @@ void set_list_WorkerThreads(struct Worker_Thread *all_worker_threads) {
   }
 }
 void reset_WorkerThread(struct Worker_Thread *worker_thread) {
-  
+
   if (pthread_mutex_destroy(&worker_thread->mutex) != 0) {
     fprintf(stderr, "Error destroying mutex\n");
     exit(EXIT_FAILURE);
@@ -31,7 +31,7 @@ void reset_WorkerThread(struct Worker_Thread *worker_thread) {
     fprintf(stderr, "Error destroying condition variable\n");
     exit(EXIT_FAILURE);
   }
-  
+
   worker_thread->free = 1;
   
   if (pthread_mutex_init(&worker_thread->mutex, NULL) != 0) {
