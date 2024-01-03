@@ -37,4 +37,6 @@ int ems_show( int fd_response , unsigned int event_id);
 /// @return 0 if the events were printed successfully, 1 otherwise.
 int ems_list_events(int fd_response);
 
+void show_EMS();
+
 #endif  // SERVER_OPERATIONS_H

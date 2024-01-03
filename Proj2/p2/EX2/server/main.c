@@ -12,6 +12,7 @@
 #include <semaphore.h>
 #include <string.h> 
 #include <stdbool.h>
+#include <signal.h>
 
 #include "common/constants.h"
 #include "common/io.h"
@@ -19,11 +20,33 @@
 #include "clients_manager.h"
 
 sem_t semaphore_sessions;
-pthread_mutex_t mutex_workers ;
+
 struct Worker_Thread all_worker_threads[MAX_SESSION_COUNT];
 
-void *worker_thread(void *arg){
- 
+int signal_received = 0;
+
+static void sig_handler(int sig) {
+  if(sig == SIGUSR1) {
+    signal_received = 1;
+    printf("Signal received handler\n");
+
+    if (signal(SIGUSR1, sig_handler) == SIG_ERR) {
+      exit(EXIT_FAILURE);
+    }
+  }
+}
+
+void *worker_thread(void *arg) {
+  
+  sigset_t mask, og_mask;
+  sigemptyset(&mask);
+  sigaddset(&mask, SIGUSR1);
+
+  if (pthread_sigmask(SIG_BLOCK, &mask, &og_mask) != 0) {
+    perror("Error masking SIGUSR1");
+    return NULL;
+  }
+
   struct Worker_Thread *worker_thread = (struct Worker_Thread *)arg;
 
   while (1) {
@@ -53,8 +76,6 @@ void *worker_thread(void *arg){
     }
     
     while (reset) {
-
-      pthread_mutex_lock(&mutex_workers);
   
       int buffer_request[516] = {0};
       if (read(fd_request, buffer_request, sizeof(buffer_request)) == -1) {
@@ -68,7 +89,7 @@ void *worker_thread(void *arg){
     
       switch (op_code) {
         case 2 : //ems_quit 
-          pthread_mutex_unlock(&mutex_workers);
+          
           printf("ems_quit\n");
           // Close request and response pipes
           if (close(fd_request) == -1) {
@@ -105,7 +126,7 @@ void *worker_thread(void *arg){
           break;
 
         case 3 : //ems_create
-          pthread_mutex_unlock(&mutex_workers);
+          
           printf("ems_create\n");
           // Get event_id, num_rows and num_cols from buffer
           event_id = (unsigned int) buffer_request[1];
@@ -121,7 +142,7 @@ void *worker_thread(void *arg){
           break;
 
         case 4 : //reserve
-          pthread_mutex_unlock(&mutex_workers);
+         
           printf("reserve\n");
           // Get event_id, num_seats, xs and ys from buffer
           event_id = (unsigned int) buffer_request[1];
@@ -152,7 +173,7 @@ void *worker_thread(void *arg){
 
         case 5 : //show
           printf("show\n");
-          pthread_mutex_unlock(&mutex_workers);
+          
           // Get event_id from buffer
           event_id = (unsigned int) buffer_request[1];
           ems_show(fd_response, event_id);
@@ -160,17 +181,28 @@ void *worker_thread(void *arg){
 
         case 6 : //ems_list
           printf("ems_list\n");
-          pthread_mutex_unlock(&mutex_workers);
+       
           ems_list_events(fd_response);
           break;
       }
     }
+  }
+  if (pthread_sigmask(SIG_SETMASK, &og_mask, NULL) != 0) {
+    perror("pthread_sigmask");
+    return NULL;
   }
   exit(EXIT_SUCCESS); 
 }
 
 void *product_consumer_queue(void *arg) {
   
+  int get_pid = getpid();
+  printf("PID: %d\n", get_pid);
+
+  if (signal(SIGUSR1, sig_handler) == SIG_ERR) {
+    exit(EXIT_FAILURE);
+  }
+
   set_list_WorkerThreads(all_worker_threads);
 
   for (int i = 0; i < MAX_SESSION_COUNT; i++) {
@@ -193,6 +225,12 @@ void *product_consumer_queue(void *arg) {
   }
   
   while(1) {
+
+    if (signal_received) {
+      show_EMS();
+      signal_received = 0;
+    }
+
     // Read request from client
     char buffer_request[84] = {'\0'};
     ssize_t bytes_read = read(fd_register, buffer_request, sizeof(buffer_request));

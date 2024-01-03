@@ -312,3 +312,41 @@ void ems_list_events(int fd_response) {
   return ;
 }
 
+void show_EMS() {
+  if (event_list == NULL) {
+    fprintf(stderr, "EMS state must be initialized\n");
+    return;
+  }
+
+  if (pthread_rwlock_rdlock(&event_list->rwl) != 0) {
+    fprintf(stderr, "Error locking list rwl\n");
+    return;
+  }
+
+  struct ListNode* to = event_list->tail;
+  struct ListNode* current = event_list->head;
+
+  if (current == NULL) {
+    printf("No events\n");
+    pthread_rwlock_unlock(&event_list->rwl);
+    return;
+  }
+
+  while (1) {
+    struct Event* event = current->event;
+    printf("Event %u\n", event->id);
+    for (size_t i = 0; i < event->rows; i++) {
+      for (size_t j = 0; j < event->cols; j++) {
+        printf("%u ", event->data[i * event->cols + j]);
+      }
+      printf("\n");
+    }
+    if (current == to) {
+      break;
+    }
+    current = current->next;
+  }
+
+  pthread_rwlock_unlock(&event_list->rwl);
+  return;
+}
