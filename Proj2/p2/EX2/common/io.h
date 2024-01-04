@@ -21,6 +21,6 @@ int print_uint(int fd, unsigned int value);
 int print_str(int fd, const char *str);
 
 /// 
-void int_to_buffer(unsigned int num, char *buffer);
+int check_write(int fd, const void *buf, size_t count);
 
 #endif  // COMMON_IO_H
