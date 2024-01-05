@@ -110,11 +110,9 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
 
 int ems_quit(void) { 
   //TODO: close pipes
-  int buffer_to_server[1] ;
-  buffer_to_server[0] = 2;
+  int op_code = 2;
   // Make request to server
-  printf("buffer to server %d\n", buffer_to_server[0]);
-  if (check_write(fd_server_resquest, buffer_to_server, sizeof(buffer_to_server))) {
+  if (check_write(fd_server_resquest, &op_code, sizeof(op_code))) {
     fprintf(stderr, "Error writing to server pipe\n");
     return 1;
   }
@@ -133,49 +131,25 @@ int ems_quit(void) {
 }
 
 int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
-  /*char *buffer_to_server = malloc(sizeof(char) + sizeof(unsigned int) + 2 * sizeof(size_t));
-  size_t cursor = 0;
-  char op_code = '3';
-  memcpy(buffer_to_server + cursor, &op_code, sizeof(char));
-  cursor += sizeof(char);
-  memcpy(buffer_to_server + cursor, &event_id, sizeof(unsigned int));
-  cursor += sizeof(unsigned int);
-  memcpy(buffer_to_server + cursor, &num_rows, sizeof(size_t));
-  cursor += sizeof(size_t);
-  memcpy(buffer_to_server + cursor, &num_cols, sizeof(size_t));
-*/
-
-  /*cursor = add_to_buffer(buffer_to_server, cursor, sizeof(char), (void *)'3');
-  cursor = add_to_buffer(buffer_to_server, cursor, sizeof(unsigned int), (void *)&event_id);
-  cursor = add_to_buffer(buffer_to_server, cursor, sizeof(size_t), (void *)num_rows);
-  cursor = add_to_buffer(buffer_to_server, cursor, sizeof(size_t), (void *)num_cols);
-
-  char op_code ;
-  unsigned int event_id_;
-  size_t num_rows_;
-  size_t num_cols_;
-  memcpy(buffer_to_server, &op_code, sizeof(char));
-  memcpy(buffer_to_server + sizeof(char), &event_id_, sizeof(unsigned int));
-  memcpy(buffer_to_server + sizeof(char) + sizeof(unsigned int), &num_rows_, sizeof(size_t));
-  memcpy(buffer_to_server + sizeof(char) + sizeof(unsigned int) + sizeof(size_t), &num_cols_, sizeof(size_t));
   
+  int op_code = 3;  
 
-  
-  printf("op_code: %d\n", op_code);
-  printf("event_id: %d\n", event_id_);
-  printf("num_rows: %ld\n", num_rows_);
-  printf("num_cols: %ld\n", num_cols_);*/
-  int buffer_to_server[4] = {0};
-  buffer_to_server[0] = 3;              
-  buffer_to_server[1] = (int) event_id;
-  buffer_to_server[2] = (int) num_rows;
-  buffer_to_server[3] = (int) num_cols;
-
-  if (check_write(fd_server_resquest, buffer_to_server, sizeof(buffer_to_server))) {
+  if (check_write(fd_server_resquest, &op_code, sizeof(op_code))) {
     fprintf(stderr, "Error writing to server pipe\n");
     return 1;
   }
-  
+  if (check_write(fd_server_resquest, &event_id, sizeof(event_id))) {
+    fprintf(stderr, "Error writing to server pipe\n");
+    return 1;
+  }
+  if (check_write(fd_server_resquest, &num_rows, sizeof(num_rows))) {
+    fprintf(stderr, "Error writing to server pipe\n");
+    return 1;
+  }
+  if (check_write(fd_server_resquest, &num_cols, sizeof(num_cols))) {
+    fprintf(stderr, "Error writing to server pipe\n");
+    return 1;
+  }
   // Read response
   int buffer_from_server[1];
   if (check_read(fd_server_response, buffer_from_server, sizeof(buffer_from_server))) {
@@ -188,47 +162,51 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
 
 int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys) {
 
-  /*char *buffer_to_server = malloc(sizeof(char) + sizeof(unsigned int) + sizeof(size_t) + 2 * num_seats * sizeof(size_t));
-  size_t cursor = 0;
-  char op_code = '4';
-  memcpy(buffer_to_server + cursor, &op_code, sizeof(char));
-  cursor += sizeof(char);
-  memcpy(buffer_to_server + cursor, &event_id, sizeof(unsigned int));
-  cursor += sizeof(unsigned int);
-  memcpy(buffer_to_server + cursor, &num_seats, sizeof(size_t));
-  cursor += sizeof(size_t);
-  for (size_t i = 0; i < num_seats; i++) {
-    memcpy(buffer_to_server + cursor, &xs[i], sizeof(size_t));
-    cursor += sizeof(size_t);
-  }
-  for (size_t i = 0; i < num_seats; i++) {
-    memcpy(buffer_to_server + cursor, &ys[i], sizeof(size_t));
-    cursor += sizeof(size_t);
-  }*/
+  int op_code = 4;
+  size_t buffer_to_server_xs[num_seats];
+  size_t buffer_to_server_ys[num_seats];
+  memset(buffer_to_server_xs, 0, sizeof(buffer_to_server_xs));
+  memset(buffer_to_server_ys, 0, sizeof(buffer_to_server_ys));
 
-  int buffer_to_server[num_seats * 2 + 4];
-  buffer_to_server[0] = 4;
-  buffer_to_server[1] = (int) event_id;
-  buffer_to_server[2] = (int) num_seats;
-
-  size_t count = 3;
+  size_t count = 0;
   for (size_t i = 0; i < num_seats; i++) {
-    buffer_to_server[count] = (int) xs[i];
+    buffer_to_server_xs[count] = xs[i];
     count++;
   }
-  buffer_to_server[count] = -1 ;
-  count++;
+  count = 0;
   for (size_t i = 0; i < num_seats; i++) {
-    buffer_to_server[count] = (int) ys[i];
+    buffer_to_server_ys[count] = ys[i];
     count++;
   }
-  
+  printf("xs ys api client ems reserve:\n");
+  for (size_t i = 0; i < num_seats; i++) {
+    printf("%ld ", buffer_to_server_xs[i]);
+  }
+  for (size_t i = 0; i < num_seats; i++) {
+    printf("%ld ", buffer_to_server_ys[i]);
+  }
   // Send request
-  if (check_write(fd_server_resquest, buffer_to_server, sizeof(buffer_to_server))) {
+  if (check_write(fd_server_resquest, &op_code, sizeof(op_code))) {
     fprintf(stderr, "Error writing to server pipe\n");
     return 1;
   }
-  
+  if (check_write(fd_server_resquest, &event_id, sizeof(event_id))) {
+    fprintf(stderr, "Error writing to server pipe\n");
+    return 1;
+  }
+  if (check_write(fd_server_resquest, &num_seats, sizeof(num_seats))) {
+    fprintf(stderr, "Error writing to server pipe\n");
+    return 1;
+  }
+  if (check_write(fd_server_resquest, buffer_to_server_xs, sizeof(buffer_to_server_xs))) {
+    fprintf(stderr, "Error writing to server pipe\n");
+    return 1;
+  }
+  if (check_write(fd_server_resquest, buffer_to_server_ys, sizeof(buffer_to_server_ys))) {
+    fprintf(stderr, "Error writing to server pipe\n");
+    return 1;
+  }
+
   // Read response
   int buffer_from_server[1];
   if (check_read(fd_server_response, buffer_from_server, sizeof(buffer_from_server))) {
@@ -240,51 +218,59 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
 }
 
 int ems_show(int out_fd, unsigned int event_id) {
-  //TODO: send show request to the server (through the request pipe) and wait for the response (through the response pipe)
-  printf("show client\n");
-  int buffer_to_server[2];
-  buffer_to_server[0] = 5;
-  buffer_to_server[1] = (int) event_id;
-
+  
+  int op_code = 5;
   // Send request
-  if (check_write(fd_server_resquest, buffer_to_server, sizeof(buffer_to_server))) {
+  if (check_write(fd_server_resquest, &op_code, sizeof(op_code))) {
     fprintf(stderr, "Error writing to server pipe\n");
     return 1;
   }
-
-  // Read first response
-  int first_buffer_from_server[3];
+  if (check_write(fd_server_resquest, &event_id, sizeof(event_id))) {
+    fprintf(stderr, "Error writing to server pipe\n");
+    return 1;
+  }
   
-  if (check_read(fd_server_response, first_buffer_from_server, sizeof(first_buffer_from_server))) {
+  // Read first response
+  int error ;
+  size_t num_rows, num_cols;
+
+  if (check_read(fd_server_response, &error, sizeof(error))) {
     fprintf(stderr, "Error reading from server pipe\n");
     return 1;
   }
   // Check if response is valid
-  if (first_buffer_from_server[0] == 1) {
+  if (error == 1) {
     return 1;
   }
-  int num_rows = first_buffer_from_server[1];
-  int num_cols = first_buffer_from_server[2];
-  
+  if (check_read(fd_server_response, &num_rows, sizeof(num_rows))) {
+    fprintf(stderr, "Error reading from server pipe\n");
+    return 1;
+  }
+  if (check_read(fd_server_response, &num_cols, sizeof(num_cols))) {
+    fprintf(stderr, "Error reading from server pipe\n");
+    return 1;
+  }
+
   // Read second response
-  int num_seats = num_rows * num_cols;
+  size_t num_seats = num_rows * num_cols;
   
-  int second_buffer_from_server[num_seats + 1]; 
+  unsigned int second_buffer_from_server[num_seats]; 
   memset(second_buffer_from_server, 0, sizeof(second_buffer_from_server));
   
   if (check_read(fd_server_response, second_buffer_from_server, sizeof(second_buffer_from_server))) {
     fprintf(stderr, "Error reading from server pipe\n");
     return 1;
   }
-  // Check if response is valid
-  if (second_buffer_from_server[0] == 1) {
-    return 1;
-  }
   
-  int i = 1;
+  printf("second buffer from server:\n");
+  for (size_t i = 0; i < num_seats; i++) {
+    printf("%d ", second_buffer_from_server[i]);
+  }
+
+  size_t i = 1;
   while (i <= num_seats) {
     char buffer[16];
-    sprintf(buffer, "%d", second_buffer_from_server[i]);
+    sprintf(buffer, "%d", second_buffer_from_server[i - 1]);
     if (print_str(out_fd, buffer)) {
       fprintf(stderr, "Error writing to output file\n");
       return 1;
@@ -305,41 +291,41 @@ int ems_show(int out_fd, unsigned int event_id) {
 }
 
 int ems_list_events(int out_fd) {
-  
-  int buffer_to_server[1] ;
-  buffer_to_server[0] = 6;
 
+  int buffer_to_server = 6;
   // Send request
-  if (check_write(fd_server_resquest, buffer_to_server, sizeof(buffer_to_server))) {
+  if (check_write(fd_server_resquest, &buffer_to_server, sizeof(buffer_to_server))) {
     fprintf(stderr, "Error writing to server pipe\n");
     return 1;
   }
   // Read first response
-  int first_buffer_from_server[2];
-  memset(first_buffer_from_server, 0, sizeof(first_buffer_from_server));
-
-  if (check_read(fd_server_response, first_buffer_from_server, sizeof(first_buffer_from_server))) {
+  int error;
+  if (check_read(fd_server_response, &error, sizeof(error))) {
+    fprintf(stderr, "Error reading from server pipe\n");
+    return 1;
+  }
+  // Check if response is valid
+  if (error == 1) {
+    return 1;
+  }
+  // Read second response
+  size_t num_events;
+  if (check_read(fd_server_response, &num_events, sizeof(num_events))) {
     fprintf(stderr, "Error reading from server pipe\n");
     return 1;
   }
   
-  // Check if response is valid
-  if (first_buffer_from_server[0] == 1) {
-    printf("Error1\n");
-    return 1;
-  }
   // Read second response
-  int num_events = first_buffer_from_server[1];
-  int second_buffer_from_server[num_events];
+  unsigned int second_buffer_from_server[num_events];
   memset(second_buffer_from_server, 0, sizeof(second_buffer_from_server));
-  
+
   if (check_read(fd_server_response, second_buffer_from_server, sizeof(second_buffer_from_server))) {
     fprintf(stderr, "Error reading from server pipe\n");
     return 1;
   }
-  
+
   // Write response to out_fd
-  for (int i = 0; i < num_events; i++) {
+  for ( size_t i = 0; i < num_events; i++) {
     if (print_str(out_fd, "Event: ")) {
       fprintf(stderr, "Error writing to output file\n");
       return 1;

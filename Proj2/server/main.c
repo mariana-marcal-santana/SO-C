@@ -23,14 +23,14 @@ sem_t semaphore_sessions;
 
 struct Worker_Thread all_worker_threads[MAX_SESSION_COUNT];
 
-int wait_signal;
+int wait_signal = 1 ;
 
 pthread_cond_t signal_cond ;
 pthread_t signal_thread;
 
 static void sig_handler(int sig) {
   if(sig == SIGUSR1) {
-    wait_signal = 1;
+    pthread_cond_signal(&signal_cond);
     printf("Signal received handler\n");
 
     if (signal(SIGUSR1, sig_handler) == SIG_ERR) {
@@ -38,6 +38,31 @@ static void sig_handler(int sig) {
     }
   }
 }
+
+void *wait_for_signal() {   //Thread to wait for signal SIGUSR1 to show EMS using block waiting 
+  sigset_t mask, og_mask;
+  sigemptyset(&mask);
+  sigaddset(&mask, SIGUSR1);
+
+  if (pthread_sigmask(SIG_BLOCK, &mask, &og_mask) != 0) {
+    fprintf(stderr, "Error masking SIGUSR1\n");
+    return NULL;
+  }
+  
+  while (wait_signal) {                
+    printf("Waiting for signal\n");
+    pthread_cond_wait(&signal_cond, &all_worker_threads[0].mutex);
+    printf("Signal received\n");
+    show_EMS();
+  }
+  
+  if (pthread_sigmask(SIG_SETMASK, &og_mask, NULL) != 0) {
+    fprintf(stderr, "Error unmasking SIGUSR1\n");
+    return NULL;
+  }
+  exit(EXIT_SUCCESS);
+}
+  
 
 void *worker_thread(void *arg) {
   
@@ -80,13 +105,12 @@ void *worker_thread(void *arg) {
     
     while (!reset) {
   
-      int buffer_request[1024] = {0};
-      if (read(fd_request, buffer_request, sizeof(buffer_request)) == -1) {
-        fprintf(stderr, "Error reading from request pipe\n");    ////////////////////////////////////
+      int op_code ;
+      if (check_read(fd_request, &op_code, sizeof(op_code))) {
+        fprintf(stderr, "Error reading from request pipe\n");
         exit(EXIT_FAILURE);
-      }         
-
-      int op_code = buffer_request[0];      
+      }       
+    
       int return_type = 0;
       unsigned int event_id;
     
@@ -132,10 +156,22 @@ void *worker_thread(void *arg) {
           
           printf("ems_create\n");
           // Get event_id, num_rows and num_cols from buffer
-          event_id = (unsigned int) buffer_request[1];
-          size_t num_rows = (size_t) buffer_request[2];
-          size_t num_cols = (size_t) buffer_request[3];
+          size_t num_rows ;
+          size_t num_cols ;
 
+          if (check_read(fd_request, &event_id, sizeof(event_id))) {
+            fprintf(stderr, "Error reading from request pipe\n");
+            exit(EXIT_FAILURE);
+          }
+          if (check_read(fd_request, &num_rows, sizeof(num_rows))) {
+            fprintf(stderr, "Error reading from request pipe\n");
+            exit(EXIT_FAILURE);
+          }
+          if (check_read(fd_request, &num_cols, sizeof(num_cols))) {
+            fprintf(stderr, "Error reading from request pipe\n");
+            exit(EXIT_FAILURE);
+          }
+          
           return_type = ems_create(event_id, num_rows, num_cols);
     
           if (check_write(fd_response, &return_type, sizeof(return_type))) {
@@ -148,21 +184,25 @@ void *worker_thread(void *arg) {
          
           printf("reserve\n");
           // Get event_id, num_seats, xs and ys from buffer
-          event_id = (unsigned int) buffer_request[1];
-          size_t num_seats = (size_t) buffer_request[2];
-          size_t xs[MAX_RESERVATION_SIZE];
-          size_t ys[MAX_RESERVATION_SIZE];
-          for (size_t i = 0; i<num_seats; i++) {
-            if (buffer_request[3 + i] == -1) {
-              break;
-            }
-            xs[i] = (size_t) buffer_request[3 +i];
+    
+          size_t num_seats ;
+          size_t xs[MAX_RESERVATION_SIZE] = {0};
+          size_t ys[MAX_RESERVATION_SIZE] = {0};
+          if (check_read(fd_request, &event_id, sizeof(event_id))) {
+            fprintf(stderr, "Error reading from request pipe1\n");
+            exit(EXIT_FAILURE);
           }
-          for (size_t i = 0; i<num_seats; i++) {
-            if (buffer_request[4 + num_seats + i] == 0) {
-              break;
-            }
-            ys[i] = (size_t) buffer_request[4 + num_seats + i];
+          if (check_read(fd_request, &num_seats, sizeof(num_seats))) {
+            fprintf(stderr, "Error reading from request pipe2\n");
+            exit(EXIT_FAILURE);
+          }
+          if (check_read(fd_request, &xs, sizeof(size_t) * num_seats)) {
+            fprintf(stderr, "Error reading from request pipe3\n");
+            exit(EXIT_FAILURE);
+          }
+          if (check_read(fd_request, &ys, sizeof(size_t) * num_seats)) {
+            fprintf(stderr, "Error reading from request pipe4\n");
+            exit(EXIT_FAILURE);
           }
 
           return_type = ems_reserve(event_id, num_seats, xs, ys);
@@ -177,14 +217,15 @@ void *worker_thread(void *arg) {
         case 5 : //show
           printf("show\n");
           
-          // Get event_id from buffer
-          event_id = (unsigned int) buffer_request[1];
+          if (check_read(fd_request, &event_id, sizeof(event_id))) {
+            fprintf(stderr, "Error reading from request pipe\n");
+            exit(EXIT_FAILURE);
+          }
           ems_show(fd_response, event_id);
           break;
 
         case 6 : //ems_list
           printf("ems_list\n");
-       
           ems_list_events(fd_response);
           break;
       }
@@ -202,17 +243,20 @@ void *product_consumer_queue(void *arg) {
   int get_pid = getpid();
   printf("PID of the process server: %d\n", get_pid);
 
-  /*struct sigaction sa = {0};
-  sa.sa_handler = sig_handler;
-  sa.sa_flags = SA_RESTART;
-
-  if (sigaction(SIGINT, &sa, NULL) == -1) {
-    perror("sigaction");
-    exit(EXIT_FAILURE);
-  }*/
-
   if (signal(SIGUSR1, sig_handler) == SIG_ERR) {
     exit(EXIT_FAILURE);
+  }
+
+  if (pthread_cond_init(&signal_cond, NULL) != 0) {
+    fprintf(stderr, "Failed to initialize condition variable of signal\n");
+    return NULL;
+  }
+
+
+  //Initialize signal thread
+  if (pthread_create(&signal_thread, NULL, wait_for_signal, NULL) != 0) {
+    fprintf(stderr, "Failed to create thread\n");
+    return NULL;
   }
 
  //Initialize all worker threads
@@ -238,25 +282,15 @@ void *product_consumer_queue(void *arg) {
   }
   
   while(1) {
-    if (wait_signal) {
-      printf("Wait signal\n");
-      wait_signal = 0;
-      show_EMS();
-    }
+
     // Read request from client
     char buffer_request[84] = {'\0'};
-    printf("Waiting for request\n");
     ssize_t bytes_read = read(fd_register, buffer_request, sizeof(buffer_request));
     if (bytes_read == -1) {
-      if (errno == EINTR) {
-        printf("EINTR\n");
-        show_EMS();
-      }
-      else {
-        fprintf(stderr, "Error reading from register pipe\n");
-        break;
-      }
+      fprintf(stderr, "Error reading from register pipe\n");
+      break;
     }                                                             //////////////////////////////////////////
+  
     printf("Request: %s\n", buffer_request);
     printf("Request: %s\n", buffer_request + 2);
     printf("Request: %s\n", buffer_request + 42);
@@ -280,6 +314,7 @@ void *product_consumer_queue(void *arg) {
     //Unlock session
     printf("Unlock session\n");
     pthread_cond_signal(&free_worker_thread->start_cond);
+  
   }
 
   //Close register and response pipes
@@ -287,6 +322,7 @@ void *product_consumer_queue(void *arg) {
     fprintf(stderr, "Error closing register pipe\n");
     return NULL;
   }
+  
   return NULL;
 }
 
