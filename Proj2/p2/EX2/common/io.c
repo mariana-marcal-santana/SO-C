@@ -90,3 +90,13 @@ int check_write(int fd, const void *buf, size_t count) {
   return 0;
 }
 
+int check_read(int fd, void *buf, size_t count) {
+  ssize_t read_bytes = read(fd, buf, count);
+  if (read_bytes == -1) {
+    return 1;
+  }
+  else if ((size_t)read_bytes != count) {
+    return 1;
+  }
+  return 0;
+}

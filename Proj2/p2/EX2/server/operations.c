@@ -183,16 +183,18 @@ void ems_show(int fd_response, unsigned int event_id) {
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
     first_buffer[0] = 1;
-    if (write(fd_response, first_buffer, 3) == -1)
-      perror("Error writing to file descriptor");
+    if (check_write(fd_response, first_buffer, sizeof(first_buffer))) {
+      fprintf(stderr, "Error writing to file descriptor\n");
+    }
     return;
   }
 
   if (pthread_rwlock_rdlock(&event_list->rwl) != 0) {
     fprintf(stderr, "Error locking list rwl\n");
     first_buffer[0] = 1;
-    if (write(fd_response, first_buffer, 3) == -1)
-      perror("Error writing to file descriptor");
+    if (check_write(fd_response, first_buffer, sizeof(first_buffer))) {
+      fprintf(stderr, "Error writing to file descriptor\n");
+    }
     return;
   }
 
@@ -201,8 +203,9 @@ void ems_show(int fd_response, unsigned int event_id) {
   if (event == NULL) {
     fprintf(stderr, "Event not found\n");
     first_buffer[0] = 1;
-    if (write(fd_response, first_buffer, sizeof(first_buffer)) == -1)
-      perror("Error writing to file descriptor");
+    if (check_write(fd_response, first_buffer, sizeof(first_buffer))) {
+      fprintf(stderr, "Error writing to file descriptor\n");
+    }
     pthread_rwlock_unlock(&event_list->rwl);
     return;
   }
@@ -210,8 +213,9 @@ void ems_show(int fd_response, unsigned int event_id) {
   if (pthread_mutex_lock(&event->mutex) != 0) {
     fprintf(stderr, "Error locking mutex\n");
     first_buffer[0] = 1;
-    if (write(fd_response, first_buffer, sizeof(first_buffer)) == -1)
-      perror("Error writing to file descriptor");
+    if (check_write(fd_response, first_buffer, sizeof(first_buffer))) {
+      fprintf(stderr, "Error writing to file descriptor\n");
+    }
     pthread_rwlock_unlock(&event_list->rwl);
     return;
   }
@@ -220,8 +224,9 @@ void ems_show(int fd_response, unsigned int event_id) {
   first_buffer[1] = (int)event->rows;
   first_buffer[2] = (int)event->cols;
   
-  if (write(fd_response, first_buffer, sizeof(first_buffer)) == -1) {
-    perror("Error writing to file descriptor");
+  if (check_write(fd_response, first_buffer, sizeof(first_buffer))) {
+    fprintf(stderr, "Error writing to file descriptor\n");
+    pthread_mutex_unlock(&event->mutex);
     pthread_rwlock_unlock(&event_list->rwl);
     return;
   }
@@ -240,8 +245,9 @@ void ems_show(int fd_response, unsigned int event_id) {
     }
   }
   
-  if (write(fd_response, response_seats, sizeof(response_seats)) == -1) {
-    perror("Error writing to file descriptor");
+  if (check_write(fd_response, response_seats, sizeof(response_seats))) {
+    fprintf(stderr, "Error writing to file descriptor\n");
+    pthread_mutex_unlock(&event->mutex);
     return;
   }
 
@@ -256,16 +262,18 @@ void ems_list_events(int fd_response) {
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
     first_buffer[0] = 1;
-    if (write(fd_response, first_buffer, sizeof(first_buffer)) == -1)
-      perror("Error writing to file descriptor");
+    if (check_write(fd_response, first_buffer, sizeof(first_buffer))) {
+      fprintf(stderr, "Error writing to file descriptor\n");
+    }
     return ;
   }
 
   if (pthread_rwlock_rdlock(&event_list->rwl) != 0) {
     fprintf(stderr, "Error locking list rwl\n");
     first_buffer[0] = 1;
-    if (write(fd_response, first_buffer, sizeof(first_buffer)) == -1)
-      perror("Error writing to file descriptor");
+    if (check_write(fd_response, first_buffer, sizeof(first_buffer))) {
+      fprintf(stderr, "Error writing to file descriptor\n");
+    }
     return ;
   }
 
@@ -274,8 +282,9 @@ void ems_list_events(int fd_response) {
 
   if (current == NULL) {
     first_buffer[0] = 1;
-    if (write(fd_response, first_buffer, sizeof(first_buffer)) == -1)
-      perror("Error writing to file descriptor");
+    if (check_write(fd_response, first_buffer, sizeof(first_buffer))) {
+      fprintf(stderr, "Error writing to file descriptor\n");
+    }
     pthread_rwlock_unlock(&event_list->rwl);
     return;
   }
@@ -283,8 +292,8 @@ void ems_list_events(int fd_response) {
   first_buffer[0] = 0;
   first_buffer[1] = (int)event_list->num_events;
 
-  if (write(fd_response, first_buffer, sizeof(first_buffer)) == -1) {
-    perror("Error writing to file descriptor");
+  if (check_write(fd_response, first_buffer, sizeof(first_buffer))) {
+    fprintf(stderr, "Error writing to file descriptor\n");
     pthread_rwlock_unlock(&event_list->rwl);
     return;
   }
@@ -302,8 +311,8 @@ void ems_list_events(int fd_response) {
     current = current->next;
   }
 
-  if (write(fd_response, events_ids, sizeof(events_ids)) == -1) {
-    perror("Error writing to file descriptor");
+  if (check_write(fd_response, events_ids, sizeof(events_ids))) {
+    fprintf(stderr, "Error writing to file descriptor\n");
     pthread_rwlock_unlock(&event_list->rwl);
     return;
   }

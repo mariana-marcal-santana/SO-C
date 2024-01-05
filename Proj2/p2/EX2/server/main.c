@@ -82,7 +82,7 @@ void *worker_thread(void *arg) {
     pthread_cond_wait(&worker_thread->start_cond, &worker_thread->mutex);
     printf("Worker thread unlocked: %d\n", worker_thread->id_session);
  
-    int reset = 1;
+    int reset = 0;
     // Open request pipe
     printf("path_request1: %s \n", worker_thread->path_request);
     int fd_request = open(worker_thread->path_request, O_RDONLY);
@@ -98,18 +98,18 @@ void *worker_thread(void *arg) {
       exit(EXIT_FAILURE);
     }
     // Send id_session to client
-    if (write(fd_response, &worker_thread->id_session, sizeof(int)) == -1) {
+    if (check_write(fd_response, &worker_thread->id_session, sizeof(int))) {
       fprintf(stderr, "Error writing to response pipe\n");
       exit(EXIT_FAILURE);
     }
     
-    while (reset) {
+    while (!reset) {
   
-      int buffer_request[516] = {0};
+      int buffer_request[1024] = {0};
       if (read(fd_request, buffer_request, sizeof(buffer_request)) == -1) {
-        fprintf(stderr, "Error reading from request pipe\n");
+        fprintf(stderr, "Error reading from request pipe\n");    ////////////////////////////////////
         exit(EXIT_FAILURE);
-      }                     
+      }         
 
       int op_code = buffer_request[0];      
       int return_type = 0;
@@ -150,7 +150,7 @@ void *worker_thread(void *arg) {
             fprintf(stderr, "Error posting semaphore\n");
             continue;
           }
-          reset = 0;
+          reset = 1;
           break;
 
         case 3 : //ems_create
@@ -163,7 +163,7 @@ void *worker_thread(void *arg) {
 
           return_type = ems_create(event_id, num_rows, num_cols);
     
-          if (write(fd_response, &return_type, sizeof(int)) == -1) {
+          if (check_write(fd_response, &return_type, sizeof(return_type))) {
             fprintf(stderr, "Error writing to response pipe\n");
             exit(EXIT_FAILURE);
           }
@@ -193,7 +193,7 @@ void *worker_thread(void *arg) {
           return_type = ems_reserve(event_id, num_seats, xs, ys);
           
           // Send response
-          if (write(fd_response, &return_type, sizeof(return_type)) == -1) {
+          if (check_write(fd_response, &return_type, sizeof(return_type))) {
             fprintf(stderr, "Error writing to response pipe\n");
             exit(EXIT_FAILURE);
           }
@@ -225,16 +225,17 @@ void *worker_thread(void *arg) {
 void *product_consumer_queue(void *arg) {
   
   int get_pid = getpid();
-  printf("PID: %d\n", get_pid);
+  printf("PID of the process server: %d\n", get_pid);
+
+  if (signal(SIGUSR1, sig_handler) == SIG_ERR) {
+    exit(EXIT_FAILURE);
+  }
 
   if (pthread_cond_init(&signal_cond, NULL) != 0) {
     fprintf(stderr, "Failed to initialize condition variable of signal\n");
     return NULL;
   }
 
-  if (signal(SIGUSR1, sig_handler) == SIG_ERR) {
-    exit(EXIT_FAILURE);
-  }
 
   //Initialize signal thread
   if (pthread_create(&signal_thread, NULL, wait_for_signal, NULL) != 0) {
@@ -272,7 +273,7 @@ void *product_consumer_queue(void *arg) {
     if (bytes_read == -1) {
       fprintf(stderr, "Error reading from register pipe\n");
       break;
-    }
+    }                                                             //////////////////////////////////////////
     if (bytes_read != 0) {
       printf("Request: %s\n", buffer_request);
       printf("Request: %s\n", buffer_request + 2);

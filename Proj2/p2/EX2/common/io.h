@@ -22,7 +22,16 @@ int print_uint(int fd, unsigned int value);
 /// @return 0 if the string was written successfully, 1 otherwise.
 int print_str(int fd, const char *str);
 
-/// 
+/// Try to wirte to a file descriptor.
+/// @param fd The file descriptor to write to.
+/// @param buf The buffer to write.
+/// @param count The number of bytes to write.
 int check_write(int fd, const void *buf, size_t count);
+
+/// Try to read from a file descriptor.
+/// @param fd The file descriptor to read from.
+/// @param buf The buffer to read into.
+/// @param count The number of bytes to read.
+int check_read(int fd, void *buf, size_t count);
 
 #endif  // COMMON_IO_H
