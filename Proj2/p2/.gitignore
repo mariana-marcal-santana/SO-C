@@ -1,7 +1,0 @@
-*.o
-*.out
-.vscode
-EX1/client
-EX1/server
-EX2/client
-EX2/server
