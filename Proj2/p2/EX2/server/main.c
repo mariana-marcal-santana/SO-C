@@ -39,17 +39,17 @@ static void sig_handler(int sig) {
   }
 }
 
-void *wait_for_signal() {
+void *wait_for_signal() {   //Thread to wait for signal SIGUSR1 to show EMS using block waiting 
   sigset_t mask, og_mask;
   sigemptyset(&mask);
   sigaddset(&mask, SIGUSR1);
 
   if (pthread_sigmask(SIG_BLOCK, &mask, &og_mask) != 0) {
-    perror("Error masking SIGUSR1");
+    fprintf(stderr, "Error masking SIGUSR1\n");
     return NULL;
   }
   
-  while (wait_signal) {
+  while (wait_signal) {                
     printf("Waiting for signal\n");
     pthread_cond_wait(&signal_cond, &all_worker_threads[0].mutex);
     printf("Signal received\n");
@@ -57,7 +57,7 @@ void *wait_for_signal() {
   }
   
   if (pthread_sigmask(SIG_SETMASK, &og_mask, NULL) != 0) {
-    perror("pthread_sigmask");
+    fprintf(stderr, "Error unmasking SIGUSR1\n");
     return NULL;
   }
   exit(EXIT_SUCCESS);
