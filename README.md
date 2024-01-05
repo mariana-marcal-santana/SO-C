@@ -1,14 +1,13 @@
 # SO-C
 
-This project was done by:
+These project were done by:
 
 Mariana Santana - ist1106992
 
 João Rodrigues - ist1106221
 
-It has 3 folders and in each one is the solution to the respective exercise.
+These projects implement an Event Management System (EMS) that allows the creation, reserve and verification of ticket availability of events and were made using the POSIX programming interface for file systems.
 
-To run the project compile it (command make) inside the folder of the exercise you want to test, and execute with ./ems followed by the proper arguments for the exercise in question.
+Proj1: EMS parallelized with processes and threads;
 
-To eliminate the executable files as well as the files resulting from the execution of the project use command make clean.
-
+Proj2: EMS acessible to clients via named pipes and allowing iteractions with signals (SIGUSR1).
