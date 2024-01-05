@@ -23,14 +23,14 @@ sem_t semaphore_sessions;
 
 struct Worker_Thread all_worker_threads[MAX_SESSION_COUNT];
 
-int wait_signal = 1 ;
+int wait_signal;
 
 pthread_cond_t signal_cond ;
 pthread_t signal_thread;
 
 static void sig_handler(int sig) {
   if(sig == SIGUSR1) {
-    pthread_cond_signal(&signal_cond);
+    wait_signal = 1;
     printf("Signal received handler\n");
 
     if (signal(SIGUSR1, sig_handler) == SIG_ERR) {
@@ -38,31 +38,6 @@ static void sig_handler(int sig) {
     }
   }
 }
-
-void *wait_for_signal() {   //Thread to wait for signal SIGUSR1 to show EMS using block waiting 
-  sigset_t mask, og_mask;
-  sigemptyset(&mask);
-  sigaddset(&mask, SIGUSR1);
-
-  if (pthread_sigmask(SIG_BLOCK, &mask, &og_mask) != 0) {
-    fprintf(stderr, "Error masking SIGUSR1\n");
-    return NULL;
-  }
-  
-  while (wait_signal) {                
-    printf("Waiting for signal\n");
-    pthread_cond_wait(&signal_cond, &all_worker_threads[0].mutex);
-    printf("Signal received\n");
-    show_EMS();
-  }
-  
-  if (pthread_sigmask(SIG_SETMASK, &og_mask, NULL) != 0) {
-    fprintf(stderr, "Error unmasking SIGUSR1\n");
-    return NULL;
-  }
-  exit(EXIT_SUCCESS);
-}
-  
 
 void *worker_thread(void *arg) {
   
@@ -227,20 +202,17 @@ void *product_consumer_queue(void *arg) {
   int get_pid = getpid();
   printf("PID of the process server: %d\n", get_pid);
 
+  /*struct sigaction sa = {0};
+  sa.sa_handler = sig_handler;
+  sa.sa_flags = SA_RESTART;
+
+  if (sigaction(SIGINT, &sa, NULL) == -1) {
+    perror("sigaction");
+    exit(EXIT_FAILURE);
+  }*/
+
   if (signal(SIGUSR1, sig_handler) == SIG_ERR) {
     exit(EXIT_FAILURE);
-  }
-
-  if (pthread_cond_init(&signal_cond, NULL) != 0) {
-    fprintf(stderr, "Failed to initialize condition variable of signal\n");
-    return NULL;
-  }
-
-
-  //Initialize signal thread
-  if (pthread_create(&signal_thread, NULL, wait_for_signal, NULL) != 0) {
-    fprintf(stderr, "Failed to create thread\n");
-    return NULL;
   }
 
  //Initialize all worker threads
@@ -259,46 +231,55 @@ void *product_consumer_queue(void *arg) {
     return NULL;
   }  
   // Open register pipe
-  int fd_register = open(path_register_FIFO, O_RDONLY);
+  int fd_register = open(path_register_FIFO, O_RDWR);
   if (fd_register == -1) {
     fprintf(stderr, "Error opening register pipe\n");
     return NULL;
   }
   
   while(1) {
-
+    if (wait_signal) {
+      printf("Wait signal\n");
+      wait_signal = 0;
+      show_EMS();
+    }
     // Read request from client
     char buffer_request[84] = {'\0'};
+    printf("Waiting for request\n");
     ssize_t bytes_read = read(fd_register, buffer_request, sizeof(buffer_request));
     if (bytes_read == -1) {
-      fprintf(stderr, "Error reading from register pipe\n");
-      break;
-    }                                                             //////////////////////////////////////////
-    if (bytes_read != 0) {
-      printf("Request: %s\n", buffer_request);
-      printf("Request: %s\n", buffer_request + 2);
-      printf("Request: %s\n", buffer_request + 42);
-      // Wait for new session
-      sem_wait(&semaphore_sessions);
-      fprintf (stderr, "Request session\n");
-      //Get free session 
-      struct Worker_Thread *free_worker_thread = get_free_worker_thread(all_worker_threads);
-      printf("Free Worker thread: %d\n", free_worker_thread->id_session);
-      char client_request[41], client_response[41];
-      strncpy(client_request, buffer_request + 2, 40);
-      client_request[41] = '\0';  
-      strncpy(client_response, buffer_request + 42, 40);
-      client_response[41] = '\0';
-      //Set session as busy
-      if (free_worker_thread->free) {
-        memcpy(free_worker_thread->path_request, client_request, sizeof(client_request));
-        memcpy(free_worker_thread->path_response, client_response, sizeof(client_response));
+      if (errno == EINTR) {
+        printf("EINTR\n");
+        show_EMS();
       }
-      free_worker_thread->free = 0;
-      //Unlock session
-      printf("Unlock session\n");
-      pthread_cond_signal(&free_worker_thread->start_cond);
+      else {
+        fprintf(stderr, "Error reading from register pipe\n");
+        break;
+      }
+    }                                                             //////////////////////////////////////////
+    printf("Request: %s\n", buffer_request);
+    printf("Request: %s\n", buffer_request + 2);
+    printf("Request: %s\n", buffer_request + 42);
+    // Wait for new session
+    sem_wait(&semaphore_sessions);
+    fprintf (stderr, "Request session\n");
+    //Get free session 
+    struct Worker_Thread *free_worker_thread = get_free_worker_thread(all_worker_threads);
+    printf("Free Worker thread: %d\n", free_worker_thread->id_session);
+    char client_request[41], client_response[41];
+    strncpy(client_request, buffer_request + 2, 40);
+    client_request[41] = '\0';  
+    strncpy(client_response, buffer_request + 42, 40);
+    client_response[41] = '\0';
+    //Set session as busy
+    if (free_worker_thread->free) {
+      memcpy(free_worker_thread->path_request, client_request, sizeof(client_request));
+      memcpy(free_worker_thread->path_response, client_response, sizeof(client_response));
     }
+    free_worker_thread->free = 0;
+    //Unlock session
+    printf("Unlock session\n");
+    pthread_cond_signal(&free_worker_thread->start_cond);
   }
 
   //Close register and response pipes
@@ -306,7 +287,6 @@ void *product_consumer_queue(void *arg) {
     fprintf(stderr, "Error closing register pipe\n");
     return NULL;
   }
-  
   return NULL;
 }
 

@@ -34,4 +34,11 @@ int check_write(int fd, const void *buf, size_t count);
 /// @param count The number of bytes to read.
 int check_read(int fd, void *buf, size_t count);
 
+/// Add a value to a buffer.
+/// @param buffer The buffer to add the value to.
+/// @param cursor The current cursor position in the buffer.
+/// @param size The size of the value to add.
+/// @param value The value to add.
+size_t add_to_buffer(void *buffer, size_t cursor, size_t size, const void *value);
+
 #endif  // COMMON_IO_H

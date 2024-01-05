@@ -133,7 +133,38 @@ int ems_quit(void) {
 }
 
 int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
+  /*char *buffer_to_server = malloc(sizeof(char) + sizeof(unsigned int) + 2 * sizeof(size_t));
+  size_t cursor = 0;
+  char op_code = '3';
+  memcpy(buffer_to_server + cursor, &op_code, sizeof(char));
+  cursor += sizeof(char);
+  memcpy(buffer_to_server + cursor, &event_id, sizeof(unsigned int));
+  cursor += sizeof(unsigned int);
+  memcpy(buffer_to_server + cursor, &num_rows, sizeof(size_t));
+  cursor += sizeof(size_t);
+  memcpy(buffer_to_server + cursor, &num_cols, sizeof(size_t));
+*/
+
+  /*cursor = add_to_buffer(buffer_to_server, cursor, sizeof(char), (void *)'3');
+  cursor = add_to_buffer(buffer_to_server, cursor, sizeof(unsigned int), (void *)&event_id);
+  cursor = add_to_buffer(buffer_to_server, cursor, sizeof(size_t), (void *)num_rows);
+  cursor = add_to_buffer(buffer_to_server, cursor, sizeof(size_t), (void *)num_cols);
+
+  char op_code ;
+  unsigned int event_id_;
+  size_t num_rows_;
+  size_t num_cols_;
+  memcpy(buffer_to_server, &op_code, sizeof(char));
+  memcpy(buffer_to_server + sizeof(char), &event_id_, sizeof(unsigned int));
+  memcpy(buffer_to_server + sizeof(char) + sizeof(unsigned int), &num_rows_, sizeof(size_t));
+  memcpy(buffer_to_server + sizeof(char) + sizeof(unsigned int) + sizeof(size_t), &num_cols_, sizeof(size_t));
   
+
+  
+  printf("op_code: %d\n", op_code);
+  printf("event_id: %d\n", event_id_);
+  printf("num_rows: %ld\n", num_rows_);
+  printf("num_cols: %ld\n", num_cols_);*/
   int buffer_to_server[4] = {0};
   buffer_to_server[0] = 3;              
   buffer_to_server[1] = (int) event_id;
@@ -156,6 +187,24 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
 }
 
 int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys) {
+
+  /*char *buffer_to_server = malloc(sizeof(char) + sizeof(unsigned int) + sizeof(size_t) + 2 * num_seats * sizeof(size_t));
+  size_t cursor = 0;
+  char op_code = '4';
+  memcpy(buffer_to_server + cursor, &op_code, sizeof(char));
+  cursor += sizeof(char);
+  memcpy(buffer_to_server + cursor, &event_id, sizeof(unsigned int));
+  cursor += sizeof(unsigned int);
+  memcpy(buffer_to_server + cursor, &num_seats, sizeof(size_t));
+  cursor += sizeof(size_t);
+  for (size_t i = 0; i < num_seats; i++) {
+    memcpy(buffer_to_server + cursor, &xs[i], sizeof(size_t));
+    cursor += sizeof(size_t);
+  }
+  for (size_t i = 0; i < num_seats; i++) {
+    memcpy(buffer_to_server + cursor, &ys[i], sizeof(size_t));
+    cursor += sizeof(size_t);
+  }*/
 
   int buffer_to_server[num_seats * 2 + 4];
   buffer_to_server[0] = 4;
