@@ -1,6 +1,8 @@
 #ifndef COMMON_IO_H
 #define COMMON_IO_H
 
+#include <stddef.h>
+
 /// Parses an unsigned integer from the given file descriptor.
 /// @param fd The file descriptor to read from.
 /// @param value Pointer to the variable to store the value in.

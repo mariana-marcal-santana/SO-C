@@ -23,11 +23,14 @@ sem_t semaphore_sessions;
 
 struct Worker_Thread all_worker_threads[MAX_SESSION_COUNT];
 
-int signal_received = 0;
+int wait_signal = 1 ;
+
+pthread_cond_t signal_cond ;
+pthread_t signal_thread;
 
 static void sig_handler(int sig) {
   if(sig == SIGUSR1) {
-    signal_received = 1;
+    pthread_cond_signal(&signal_cond);
     printf("Signal received handler\n");
 
     if (signal(SIGUSR1, sig_handler) == SIG_ERR) {
@@ -35,6 +38,31 @@ static void sig_handler(int sig) {
     }
   }
 }
+
+void *wait_for_signal() {
+  sigset_t mask, og_mask;
+  sigemptyset(&mask);
+  sigaddset(&mask, SIGUSR1);
+
+  if (pthread_sigmask(SIG_BLOCK, &mask, &og_mask) != 0) {
+    perror("Error masking SIGUSR1");
+    return NULL;
+  }
+  
+  while (wait_signal) {
+    printf("Waiting for signal\n");
+    pthread_cond_wait(&signal_cond, &all_worker_threads[0].mutex);
+    printf("Signal received\n");
+    show_EMS();
+  }
+  
+  if (pthread_sigmask(SIG_SETMASK, &og_mask, NULL) != 0) {
+    perror("pthread_sigmask");
+    return NULL;
+  }
+  exit(EXIT_SUCCESS);
+}
+  
 
 void *worker_thread(void *arg) {
   
@@ -199,10 +227,22 @@ void *product_consumer_queue(void *arg) {
   int get_pid = getpid();
   printf("PID: %d\n", get_pid);
 
+  if (pthread_cond_init(&signal_cond, NULL) != 0) {
+    fprintf(stderr, "Failed to initialize condition variable of signal\n");
+    return NULL;
+  }
+
   if (signal(SIGUSR1, sig_handler) == SIG_ERR) {
     exit(EXIT_FAILURE);
   }
 
+  //Initialize signal thread
+  if (pthread_create(&signal_thread, NULL, wait_for_signal, NULL) != 0) {
+    fprintf(stderr, "Failed to create thread\n");
+    return NULL;
+  }
+
+ //Initialize all worker threads
   set_list_WorkerThreads(all_worker_threads);
 
   for (int i = 0; i < MAX_SESSION_COUNT; i++) {
@@ -225,11 +265,6 @@ void *product_consumer_queue(void *arg) {
   }
   
   while(1) {
-
-    if (signal_received) {
-      show_EMS();
-      signal_received = 0;
-    }
 
     // Read request from client
     char buffer_request[84] = {'\0'};

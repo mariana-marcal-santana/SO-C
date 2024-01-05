@@ -81,6 +81,12 @@ int print_str(int fd, const char *str) {
 
 int check_write(int fd, const void *buf, size_t count) {
   ssize_t written = write(fd, buf, count);
-  if (written == -1) { return -1; }
-  return (size_t)written != count;
+  if (written == -1) {
+    return 1;
+  }
+  else if ((size_t)written != count) {
+    return 1;
+  }
+  return 0;
 }
+
