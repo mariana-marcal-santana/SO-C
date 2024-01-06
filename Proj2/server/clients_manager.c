@@ -10,7 +10,16 @@ void set_list_WorkerThreads(struct Worker_Thread *all_worker_threads) {
     all_worker_threads[i].free = 1;
     all_worker_threads[i].id_session = i;
     all_worker_threads[i].path_request = malloc(sizeof(char) * 41);
+    if (all_worker_threads[i].path_request == NULL) {
+      fprintf(stderr, "Error allocating memory\n");
+      exit(EXIT_FAILURE);
+    }
     all_worker_threads[i].path_response = malloc(sizeof(char) * 41);
+    if (all_worker_threads[i].path_response == NULL) {
+      fprintf(stderr, "Error allocating memory\n");
+      exit(EXIT_FAILURE);
+    }
+    
     if (pthread_mutex_init(&all_worker_threads[i].mutex, NULL) != 0) {
       fprintf(stderr, "Error initializing mutex\n");
       exit(EXIT_FAILURE);

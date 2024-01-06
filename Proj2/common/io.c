@@ -105,3 +105,4 @@ size_t add_to_buffer(void *buffer, size_t cursor, size_t size, const void* value
   memcpy(buffer + cursor, value, size);
   return cursor + size;
 }
+

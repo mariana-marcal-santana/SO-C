@@ -23,10 +23,18 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
   //Create the paths
   size_t len_request =  strlen(req_pipe_path) + 1;
   char  *path_request = malloc(len_request);
+  if (path_request == NULL) {
+    fprintf(stderr, "Error allocating memory\n");
+    return 1;
+  }
   snprintf(path_request, len_request, "%s", req_pipe_path);
 
   size_t len_response = strlen(resp_pipe_path) + 1;
   char *path_response = malloc(len_response);
+  if (path_response == NULL) {
+    fprintf(stderr, "Error allocating memory\n");
+    return 1;
+  }
   snprintf(path_response, len_response, "%s", resp_pipe_path);
  
   //Connect to the server pipe
@@ -110,7 +118,7 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
 
 int ems_quit(void) { 
   //TODO: close pipes
-  int op_code = 2;
+  char op_code = '2';
   // Make request to server
   if (check_write(fd_server_resquest, &op_code, sizeof(op_code))) {
     fprintf(stderr, "Error writing to server pipe\n");
@@ -132,7 +140,7 @@ int ems_quit(void) {
 
 int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
   
-  int op_code = 3;  
+  char op_code = '3';
 
   if (check_write(fd_server_resquest, &op_code, sizeof(op_code))) {
     fprintf(stderr, "Error writing to server pipe\n");
@@ -162,7 +170,7 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
 
 int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys) {
 
-  int op_code = 4;
+  char op_code = '4';
   size_t buffer_to_server_xs[num_seats];
   size_t buffer_to_server_ys[num_seats];
   memset(buffer_to_server_xs, 0, sizeof(buffer_to_server_xs));
@@ -177,13 +185,6 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
   for (size_t i = 0; i < num_seats; i++) {
     buffer_to_server_ys[count] = ys[i];
     count++;
-  }
-  printf("xs ys api client ems reserve:\n");
-  for (size_t i = 0; i < num_seats; i++) {
-    printf("%ld ", buffer_to_server_xs[i]);
-  }
-  for (size_t i = 0; i < num_seats; i++) {
-    printf("%ld ", buffer_to_server_ys[i]);
   }
   // Send request
   if (check_write(fd_server_resquest, &op_code, sizeof(op_code))) {
@@ -219,7 +220,7 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
 
 int ems_show(int out_fd, unsigned int event_id) {
   
-  int op_code = 5;
+  char op_code = '5';
   // Send request
   if (check_write(fd_server_resquest, &op_code, sizeof(op_code))) {
     fprintf(stderr, "Error writing to server pipe\n");
@@ -262,11 +263,6 @@ int ems_show(int out_fd, unsigned int event_id) {
     return 1;
   }
   
-  printf("second buffer from server:\n");
-  for (size_t i = 0; i < num_seats; i++) {
-    printf("%d ", second_buffer_from_server[i]);
-  }
-
   size_t i = 1;
   while (i <= num_seats) {
     char buffer[16];
@@ -292,9 +288,9 @@ int ems_show(int out_fd, unsigned int event_id) {
 
 int ems_list_events(int out_fd) {
 
-  int buffer_to_server = 6;
+  char op_code = '6';
   // Send request
-  if (check_write(fd_server_resquest, &buffer_to_server, sizeof(buffer_to_server))) {
+  if (check_write(fd_server_resquest, &op_code, sizeof(op_code))) {
     fprintf(stderr, "Error writing to server pipe\n");
     return 1;
   }
